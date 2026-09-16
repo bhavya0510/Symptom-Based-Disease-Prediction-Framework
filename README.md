@@ -1,338 +1,181 @@
-# Health Guard AI - Research-Grade Disease Prediction Framework
+# An Explainable and Uncertainty-Aware Symptom-Based Disease Prediction Framework with Sequential Symptom Acquisition
 
-## Overview
-**Explainable and Uncertainty-Aware Symptom-Based Disease Prediction Framework with Sequential Symptom Acquisition**
+[![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/)
+[![Flask](https://img.shields.io/badge/Backend-Flask-green.svg)](https://flask.palletsprojects.com/)
+[![scikit-learn](https://img.shields.io/badge/ML-scikit--learn-orange.svg)](https://scikit-learn.org/)
+[![XGBoost](https://img.shields.io/badge/ML-XGBoost-red.svg)](https://xgboost.readthedocs.io/)
+[![SHAP](https://img.shields.io/badge/XAI-SHAP-brightgreen.svg)](https://shap.readthedocs.io/)
+[![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
 
-An advanced ML framework for disease prediction featuring:
-- **Ensemble Learning**: Calibrated Random Forest + XGBoost ensemble
-- **Probability Calibration**: Isotonic regression for reliable confidence estimates
-- **Uncertainty Quantification**: Confidence-based abstention mechanism
-- **Sequential Questioning**: Information gain-based follow-up symptom selection
-- **Explainable AI**: SHAP-based model explanations
-- **Top-K Predictions**: Differential diagnosis with multiple candidate diseases
+An advanced machine learning framework and interactive web application for symptom-based disease prediction. Built with calibrated ensemble learning, local/global SHAP model explainability, confidence-based abstention, and stateful sequential symptom acquisition.
 
-**Dataset**: Kaggle Disease Prediction Using Machine Learning (4,962 samples, 132 symptoms, 41 diseases)
+---
 
-Model: Calibrated Ensemble (RF + XGBoost)  
-Backend: Enhanced Flask API with research endpoints  
-Frontend: Responsive HTML/CSS/JS with SHAP explanations  
-ML Stack: scikit-learn, XGBoost, SHAP, pandas, joblib  
+## 🌟 Key Features & Research Contributions
 
-## 📸 Application Screenshots
+1. **Upgraded Dataset & Strict Deduplication Protocol**
+   - Trained on the *Disease Prediction Using Machine Learning* dataset (**4,962 total records, 132 binary symptom features, 41 disease classes**).
+   - Applied pattern-level deduplication (**305 unique symptom vectors**) to eliminate exact duplicate records across train/validation/test splits, preventing severe data leakage.
 
-### 1. Hero Dashboard & Overview
-![HealthGuard AI Dashboard Overview](docs/screenshots/hero_dashboard.png)
+2. **Rigorous Model Benchmarking**
+   - Evaluates 5 baseline models (**Logistic Regression, SVM, Random Forest, XGBoost, Neural Network / MLP**) against the proposed ensemble.
+   - Evaluated across **Accuracy, Precision (Macro/Weighted), Recall (Macro/Weighted), Macro-F1, and Weighted-F1** using stratified 5-fold cross-validation and held-out test set.
 
-### 2. Symptom Analysis & Disease Prediction Results
-![Symptom Analysis & Disease Prediction Results](docs/screenshots/disease_prediction_results.png)
+3. **Proposed Calibrated Ensemble**
+   - **Soft-Voting Ensemble** combining **Random Forest** and **XGBoost**.
+   - Calibrated using **Isotonic Regression** to convert raw model scores into true probability distributions.
+
+4. **Explainable AI (SHAP Interpretability)**
+   - Integrated SHAP (`TreeExplainer`) to compute local feature attribution for every individual prediction, highlighting positive (aggravating) and negative (mitigating) symptom impacts.
+
+5. **Top-K Differential Diagnosis**
+   - Provides ranked candidate diseases (Top-1, Top-3, Top-5) alongside calibrated confidence scores.
+
+6. **Uncertainty Quantification & Abstention**
+   - Automated confidence thresholding (`0.10`). If maximum prediction confidence is below threshold, the system abstains from making a forced diagnosis and prompts:
+     > *"Insufficient information — please provide additional symptoms"*
+
+7. **Sequential Symptom Acquisition**
+   - Stateful follow-up questioning driven by a **Mutual Information matrix** ($132 \text{ symptoms} \times 41 \text{ diseases}$). Dynamically selects unasked symptoms with maximum expected information gain when predictions are uncertain.
+
+---
+
+## 📸 Web Application Screenshots
+
+### 1. Hero Dashboard & System Overview
+![Hero Dashboard](docs/screenshots/hero_dashboard.png)
+
+### 2. AI Disease Prediction & SHAP Explanation Factors
+![Disease Prediction Results](docs/screenshots/disease_prediction_results.png)
 
 ### 3. Dark Mode UI Preview
-![Dark Mode UI Preview](docs/screenshots/dark_mode_preview.png)
+![Dark Mode Preview](docs/screenshots/dark_mode_preview.png)
 
-## Dataset Details
-| Feature | Type | Values |
-|---------|------|---------|
-| Fever | Binary | Yes/No |
-| Cough | Binary | Yes/No |
-| Fatigue | Binary | Yes/No |
-| Difficulty Breathing | Binary | Yes/No |
-| Age | Numeric | 19-90 |
-| Gender | Categorical | Male/Female |
-| Blood Pressure | Categorical | Low/Normal/High |
-| Cholesterol Level | Categorical | Low/Normal/High |
-| Target | Multi-class (116 diseases) | Influenza, Asthma, Pneumonia... |
+---
 
-## Quick Start
+## 📊 Empirical Model Performance Comparison
 
-### Research Framework Setup
+| Model | CV F1-Macro | Test Accuracy | Test Precision | Test Recall | Test F1-Macro |
+|:---|:---:|:---:|:---:|:---:|:---:|
+| **Logistic Regression** | 1.0000 ± 0.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
+| **SVM** | 1.0000 ± 0.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
+| **Random Forest** | 0.9940 ± 0.0120 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
+| **XGBoost** | 0.9081 ± 0.0479 | 0.9783 | 0.9878 | 0.9878 | 0.9837 |
+| **MLP** | 1.0000 ± 0.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
+| **Calibrated Ensemble (RF + XGB)** | **1.0000 ± 0.0000** | **1.0000** | **1.0000** | **1.0000** | **1.0000** |
+
+*Note: High baseline metric scores reflect dataset characteristics (305 unique symptom patterns for 41 classes). XGBoost demonstrates realistic variance under stratified 5-fold cross-validation.*
+
+---
+
+## 🔄 System Architecture & Data Flow
+
+```
+          Symptom Dataset (4,962 records / 132 symptoms / 41 diseases)
+                                      ↓
+                     Data Cleaning & Pattern Deduplication (305 unique)
+                                      ↓
+                        Stratified Train / Val / Test (70/15/15)
+                                      ↓
+                       ┌──────────────┼──────────────┐
+                       ↓              ↓              ↓
+                      SVM             RF          XGBoost
+                       ↓              ↓              ↓
+                       └──────────────┼──────────────┘
+                                      ↓
+                          Proposed Soft-Voting Ensemble
+                                      ↓
+                       Isotonic Probability Calibration
+                                      ↓
+                           Uncertainty Detection
+                                      ↓
+                      ┌───────────────┴───────────────┐
+                      ↓                               ↓
+               Confident (≥ threshold)         Uncertain (< threshold)
+                      ↓                               ↓
+               Top-K Diseases                  Ask Useful Symptoms (MI)
+                      ↓                               ↓
+               SHAP Explanation                Update Prediction Loop
+                                      ↓
+                             Flask Web Application
+```
+
+---
+
+## ⚡ Quick Start & Installation
+
+### Prerequisites
+- Python 3.9+
+- pip & virtualenv
+
+### 1. Clone & Set Up Research Pipeline
 ```bash
-# Navigate to research directory
-cd research
+# Clone repository
+git clone https://github.com/bhavya0510/Symptom-Based-Disease-Prediction-Framework.git
+cd Symptom-Based-Disease-Prediction-Framework/research
 
-# Create virtual environment and install dependencies
+# Create virtual environment & install dependencies
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# Run training pipeline (Stages 1-4)
+# Run complete training pipeline (Stages 1 to 8)
 python train_pipeline.py
-
-# This will:
-# - Clean and split data
-# - Train baseline models
-# - Build ensemble model
-# - Apply probability calibration
-# - Copy artifacts to backend
 ```
 
-### Run Enhanced Application
+### 2. Launch Flask Web Server
 ```bash
-# Start Flask backend with research features
-cd HealthGuardAI/backend
+# Start Flask app
+cd ../HealthGuardAI/backend
 ../../research/venv/bin/python app.py
 ```
-URL: http://127.0.0.1:5050
+Open **`http://127.0.0.1:5050`** in your browser.
 
-### Legacy Quick Start (Original Dataset)
-```bash
-cd HealthGuardAI
-pip install -r requirements.txt
-cd backend
-python train_model.py  # Uses legacy dataset
-python app.py
-```
-URL: http://127.0.0.1:5000
+---
 
-## API Endpoints
+## 🔌 API Reference
 
-### Enhanced Research Endpoints (Port 5050)
+| Endpoint | Method | Description |
+|:---|:---:|:---|
+| `/predict` | `POST` | Accepts user symptom array; returns Top-K predictions, SHAP explanations, and abstention status. |
+| `/followup` | `POST` | Sequential questioning endpoint driven by Mutual Information. |
+| `/symptoms` | `GET` | Returns full list of 132 available binary symptom features. |
+| `/model-comparison` | `GET` | Returns model evaluation benchmarks across CV and Test sets. |
+| `/health` | `GET` | System health check and model artifact status. |
 
-**POST /predict** - Enhanced prediction with research features
-```json
-{
-  "symptoms": ["itching", "skin_rash", "high_fever"],
-  "top_k": 3
-}
-```
-**Response**:
-```json
-{
-  "predictions": [
-    {"disease": "Fungal infection", "confidence": 0.92},
-    {"disease": "Allergy", "confidence": 0.05},
-    {"disease": "Drug Reaction", "confidence": 0.02}
-  ],
-  "top_prediction": "Fungal infection",
-  "max_confidence": 0.92,
-  "should_abstain": false,
-  "abstention_threshold": 0.10,
-  "shap_explanation": [
-    {"symptom": "itching", "shap_value": 0.45, "impact": "positive"},
-    {"symptom": "skin_rash", "shap_value": 0.32, "impact": "positive"}
-  ],
-  "disclaimer": "This is an AI decision-support prototype, not medical advice."
-}
-```
+---
 
-**POST /followup** - Sequential symptom questioning
-```json
-{
-  "session_id": "user123",
-  "symptoms": ["itching"],
-  "max_questions": 5
-}
-```
-**Response** (if uncertain):
-```json
-{
-  "status": "question",
-  "next_question": "Do you have skin rash?",
-  "symptom_name": "skin_rash",
-  "current_confidence": 0.35,
-  "questions_asked": ["skin_rash"],
-  "questions_remaining": 4
-}
-```
-**Response** (if confident):
-```json
-{
-  "status": "final",
-  "prediction": "Fungal infection",
-  "confidence": 0.92,
-  "questions_asked": ["skin_rash", "nodal_skin_eruptions"],
-  "disclaimer": "This is an AI decision-support prototype, not medical advice."
-}
-```
-
-**GET /health** - System health check
-```json
-{
-  "status": "healthy",
-  "model_type": "Calibrated Ensemble (RF + XGBoost)",
-  "n_classes": 41,
-  "n_features": 132,
-  "shap_available": true,
-  "abstention_available": true
-}
-```
-
-### Legacy Endpoint (Port 5000 - Original Dataset)
-**POST /predict** - Original simple prediction
-```json
-{
-  "symptoms": ["Fever", "Cough"],
-  "age": 25,
-  "gender": "Male"
-}
-```
-
-## Frontend Features
-- **Enhanced Results**: Top-K disease predictions with confidence bars
-- **SHAP Explanations**: Key contributing factors for predictions
-- **Abstention Handling**: "Insufficient information" messages when uncertain
-- **Sequential Questioning**: Chat-style follow-up interface (UI ready)
-- **Responsive Design**: Mobile/desktop compatibility
-- **Dark Mode**: Theme switching
-- **Loading States**: Progress indicators
-- **Error Handling**: Graceful degradation
-
-## Model Performance
-
-### Research Framework Results
-- **Dataset**: 4,962 samples, 41 diseases, 132 symptoms
-- **Calibrated Ensemble**: 99.6% accuracy, 99.6% F1-macro
-- **Top-K Accuracy**: Top-1 = 99.6%, Top-3 = 100%, Top-5 = 100%
-- **Calibration**: Brier score improved from 0.0030 to 0.0000
-- **Uncertainty**: Optimal threshold = 0.10, abstention rate = 0%
-
-### Baseline Comparison
-All models achieved near-perfect performance due to dataset limitations:
-- Logistic Regression: 100% accuracy
-- SVM: 100% accuracy
-- Random Forest: 100% accuracy
-- XGBoost: 100% accuracy
-- MLP: 100% accuracy
-
-### Legacy Model Results (Archived)
-- **Original Dataset**: 349 samples, 116 diseases, 4 symptoms + patient profile
-- **Location**: `research/data/legacy/Disease_symptom_and_patient_profile_dataset.csv`
-- **Random Forest**: Trained on full dataset (no split for small classes)
-- **Features**: 4 binary symptoms + 4 profile variables
-- **Note**: Replaced by larger Kaggle dataset with 132 symptoms, 41 diseases
-
-## Tech Stack
-```
-Research Framework:
-- Backend: Python 3.14, Flask, scikit-learn 1.9, XGBoost 3.4, SHAP 0.52
-- Frontend: HTML5, CSS3, Vanilla JS (enhanced)
-- ML: Calibrated Ensemble (RF + XGBoost), Isotonic Calibration, SHAP TreeExplainer
-- Research: Mutual Information, Sequential Questioning, Uncertainty Quantification
-
-Legacy System:
-- Backend: Python 3.12, Flask 3.0, scikit-learn 1.5
-- Frontend: HTML5, CSS3, Vanilla JS
-- ML: RandomForestClassifier, ColumnTransformer, LabelEncoder
-```
-
-## Project Structure
-```
-Symptom-Based-Disease-Prediction-main/
-├── research/                          # Research framework
-│   ├── stage0_setup.py               # Dataset verification
-│   ├── stage1_data_splitting.py      # Data cleaning & splitting
-│   ├── stage2_baseline_comparison.py # Baseline model training
-│   ├── stage3_ensemble_model.py      # Ensemble development
-│   ├── stage4_probability_calibration.py # Probability calibration
-│   ├── stage5_topk_metrics.py        # Top-K accuracy computation
-│   ├── stage6_uncertainty_abstention.py # Uncertainty quantification
-│   ├── stage7_sequential_questioning.py # Sequential questioning
-│   ├── stage8_shap_explainability.py # SHAP integration
-│   ├── train_pipeline.py             # End-to-end training pipeline
-│   ├── requirements.txt              # Research dependencies
-│   ├── METHODOLOGY.md                # Comprehensive methodology
-│   ├── RESULTS_SUMMARY.md            # Results summary
-│   ├── data/
-│   │   ├── raw/                     # Original datasets
-│   │   ├── processed/               # Cleaned & split data
-│   │   └── legacy/                  # Legacy dataset
-│   └── results/                     # Research artifacts
-│       ├── model_comparison.csv      # Model performance table
-│       ├── shap_summary_*.png        # SHAP visualizations
-│       ├── reliability_diagram.png   # Calibration visualization
-│       └── *.pkl                     # Trained models & systems
-├── HealthGuardAI/
-│   ├── backend/
-│   │   ├── app.py                   # Enhanced Flask API
-│   │   ├── app_old_backup.py        # Original Flask API (backup)
-│   │   ├── train_model.py           # Legacy training script
-│   │   ├── create_metadata.py       # Metadata generation
-│   │   ├── artifacts/               # Production model artifacts
-│   │   │   ├── model.pkl           # Calibrated ensemble
-│   │   │   ├── encoder.pkl         # Label encoder
-│   │   │   ├── metadata.pkl         # System metadata
-│   │   │   ├── mutual_information.pkl # MI matrix
-│   │   │   ├── shap_system.pkl      # SHAP explainer
-│   │   │   └── abstention_config.pkl # Abstention config
-│   │   ├── model.pkl                # Legacy model (if exists)
-│   │   ├── encoder.pkl              # Legacy encoder (if exists)
-│   │   └── metadata.pkl             # Legacy metadata (if exists)
-│   ├── frontend/
-│   │   ├── index.html
-│   │   ├── style.css
-│   │   └── script.js                # Enhanced with research features
-│   ├── dataset/
-│   │   └── Disease_symptom...csv    # Legacy dataset
-│   └── requirements.txt             # Legacy dependencies
-├── New Dataset/                      # Original enhanced dataset
-│   ├── Training.csv
-│   └── Testing.csv
-├── Disease_symptom...csv            # Legacy dataset (root level)
-└── README.md                        # This file
-```
-
-## Limitations & Disclaimer
-
-### Research Framework Limitations
-- **Dataset Limitations**: Only 305 unique patterns for 4,962 samples limits generalization assessment
-- **Pattern Overlap**: Significant overlap between train/test splits affects traditional metrics
-- **SHAP Scope**: Explanations limited to XGBoost component (ensemble limitation)
-- **Abstention Rate**: Low abstention due to high model confidence (dataset characteristic)
-
-### General Limitations
-- **Educational Prototype**: Not for clinical diagnosis without validation
-- **Not Medical Advice**: Always consult healthcare professionals
-- **Dataset Specific**: Performance may not generalize to real clinical data
-- **Symptom Coverage**: Limited to 132 symptoms in training dataset
-
-### Disclaimer
-This is an AI decision-support prototype for research purposes. It is not a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of your physician or other qualified health provider with any questions you may have regarding a medical condition.
-
-## Troubleshooting
-
-### Research Framework
-```bash
-# Training pipeline fails
-cd research
-source venv/bin/activate
-pip install -r requirements.txt  # Ensure all dependencies installed
-
-# Backend import errors
-cd HealthGuardAI/backend
-../../research/venv/bin/python app.py  # Use research venv
-
-# SHAP errors
-# SHAP requires specific dependencies - ensure research venv is activated
-```
-
-### Legacy System
-```bash
-Flask not found → python app.py
-Model not found → rerun train_model.py
-CORS error → flask-cors installed
-```
-
-## Research Documentation
-
-- **Methodology**: `research/METHODOLOGY.md` - Comprehensive research methodology
-- **Results**: `research/RESULTS_SUMMARY.md` - Detailed results summary
-- **Artifacts**: `research/results/` - All generated plots, models, and data files
-
-## Citation
-
-If you use this research framework, please cite:
+## 📁 Repository Structure
 
 ```
-Explainable and Uncertainty-Aware Symptom-Based Disease Prediction Framework
-with Sequential Symptom Acquisition
+.
+├── HealthGuardAI/               # Production Web Application
+│   ├── backend/                 # Flask API Server & Artifacts
+│   │   ├── app.py               # Flask backend application
+│   │   ├── shap_utils.py        # Local SHAP explanation helper
+│   │   └── artifacts/           # Calibrated model, metadata, & SHAP explainer
+│   └── frontend/                # Web Dashboard
+│       ├── index.html           # Main HTML structure
+│       ├── script.js            # Frontend logic & dynamic API calls
+│       └── style.css            # Modern CSS design system & dark mode
+├── research/                    # Machine Learning Research Framework
+│   ├── train_pipeline.py        # Master pipeline executor (Stages 1-8)
+│   ├── stage1_data_splitting.py # Data cleaning & stratified deduplication
+│   ├── stage2_baseline_comparison.py # Baseline model benchmarking
+│   ├── stage3_ensemble_model.py # Soft-voting & stacking ensemble build
+│   ├── stage4_probability_calibration.py # Isotonic probability calibration
+│   ├── stage5_topk_metrics.py   # Top-1/3/5 accuracy metrics
+│   ├── stage6_uncertainty_abstention.py # Confidence threshold sweep
+│   ├── stage7_sequential_questioning.py # Mutual Information calculator
+│   ├── stage8_shap_explainability.py    # SHAP global & local explainers
+│   ├── data/                    # Cleaned & processed datasets
+│   └── results/                 # Metrics CSVs, confusion matrices & plots
+├── docs/screenshots/            # Application Screenshots
+├── New Dataset/                 # Raw Kaggle Training & Testing CSVs
+└── README.md                    # Main Project Documentation
 ```
 
-## Future Work
+---
 
-1. **Dataset Expansion**: Acquire larger, diverse clinical datasets
-2. **External Validation**: Test on independent datasets
-3. **Clinical Integration**: Pilot testing with healthcare professionals
-4. **User Studies**: Evaluate explainability and uncertainty communication
-5. **Model Enhancement**: Explore more sophisticated architectures
-6. **Real-world Deployment**: Clinical validation studies
-
-Ready for production demo! All specs implemented.
+## ⚠️ Medical Disclaimer
+This project is a decision-support prototype created strictly for academic research and demonstration purposes. It does not provide medical advice or diagnosis. Always consult a qualified healthcare professional for medical evaluation.
