@@ -1,6 +1,6 @@
-# HealthGuard AI Web Application
+# HealthGuard AI: Adaptive Symptom-Based Diagnostic Engine
 
-An interactive web application demonstrating the **Explainable and Uncertainty-Aware Symptom-Based Disease Prediction Framework**.
+An interactive web application demonstrating the **Explainable, Uncertainty-Aware & Sequential Disease Prediction Framework**.
 
 ---
 

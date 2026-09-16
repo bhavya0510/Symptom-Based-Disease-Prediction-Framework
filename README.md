@@ -1,4 +1,6 @@
-# An Explainable and Uncertainty-Aware Symptom-Based Disease Prediction Framework with Sequential Symptom Acquisition
+# HealthGuard AI: Adaptive Symptom-Based Diagnostic Engine
+
+> **Explainable, Uncertainty-Aware & Sequential Disease Prediction Framework**
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/Backend-Flask-green.svg)](https://flask.palletsprojects.com/)
