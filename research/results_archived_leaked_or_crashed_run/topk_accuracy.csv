@@ -1,0 +1,7 @@
+Model,Top-1,Top-3,Top-5
+Logistic Regression,1.0,1.0,1.0
+SVM,1.0,1.0,1.0
+Random Forest,1.0,1.0,1.0
+XGBoost,0.9347826086956522,0.9782608695652174,1.0
+MLP,1.0,1.0,1.0
+Calibrated Ensemble,1.0,1.0,1.0

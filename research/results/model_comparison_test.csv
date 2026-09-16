@@ -1,0 +1,7 @@
+Model,Test_Accuracy,Test_Precision_Macro,Test_Recall_Macro,Test_F1_Macro,Test_F1_Weighted
+Logistic Regression,1.0,1.0,1.0,1.0,1.0
+SVM,1.0,1.0,1.0,1.0,1.0
+Random Forest,1.0,1.0,1.0,1.0,1.0
+XGBoost,0.9782608695652174,0.9878048780487804,0.9878048780487804,0.983739837398374,0.9782608695652174
+MLP,1.0,1.0,1.0,1.0,1.0
+Proposed Ensemble (Soft-Voting (RF+XGB)),1.0,1.0,1.0,1.0,1.0
