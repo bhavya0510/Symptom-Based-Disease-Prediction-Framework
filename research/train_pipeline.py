@@ -1,13 +1,14 @@
 """
-Training Pipeline - Runs Stages 1-8 end-to-end and saves production artifacts
+Training Pipeline - Runs Stages 1-10 end-to-end and saves production artifacts
 This script should be run to train/retrain the model and generate all required artifacts.
+Enhanced with rigorous evaluation: calibration metrics, abstention analysis, sequential questioning evaluation, duplicate analysis, and ablation study.
 """
 import os
 import sys
 import subprocess
 
 print("=" * 80)
-print("TRAINING PIPELINE - Stages 1-8")
+print("TRAINING PIPELINE - Stages 1-10")
 print("=" * 80)
 
 # Run Stage 1: Data Cleaning & Splitting
@@ -65,6 +66,20 @@ print("STAGE 8: SHAP Explainability")
 print("="*60)
 result = subprocess.run([sys.executable, 'stage8_shap_explainability.py'], check=True)
 print(f"Stage 8 completed with exit code: {result.returncode}")
+
+# Run Stage 9: Duplicate and Leakage Analysis
+print("\n" + "="*60)
+print("STAGE 9: Duplicate and Leakage Analysis")
+print("="*60)
+result = subprocess.run([sys.executable, 'stage9_duplicate_leakage_analysis.py'], check=True)
+print(f"Stage 9 completed with exit code: {result.returncode}")
+
+# Run Stage 10: Ablation Study
+print("\n" + "="*60)
+print("STAGE 10: Ablation Study")
+print("="*60)
+result = subprocess.run([sys.executable, 'stage10_ablation_study.py'], check=True)
+print(f"Stage 10 completed with exit code: {result.returncode}")
 
 # Copy artifacts to backend directory
 print("\n" + "="*60)

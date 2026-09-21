@@ -43,7 +43,7 @@ print("✅ Loaded calibrated ensemble")
 def evaluate_with_abstention(X, y_true, model, threshold):
     """
     Evaluate model with abstention at given confidence threshold
-    Returns: accuracy, abstention_rate
+    Returns: accuracy, abstention_rate, coverage, error_rate
     """
     y_pred_proba = model.predict_proba(X)
     max_confidence = np.max(y_pred_proba, axis=1)
@@ -53,13 +53,15 @@ def evaluate_with_abstention(X, y_true, model, threshold):
     confident_mask = max_confidence >= threshold
     
     if confident_mask.sum() == 0:
-        return 0.0, 1.0  # No confident predictions
+        return 0.0, 1.0, 0.0, 1.0  # No confident predictions
     
     # Calculate accuracy only on confident predictions
     accuracy = accuracy_score(y_true[confident_mask], y_pred[confident_mask])
     abstention_rate = 1.0 - confident_mask.mean()
+    coverage = confident_mask.mean()
+    error_rate = 1.0 - accuracy
     
-    return accuracy, abstention_rate
+    return accuracy, abstention_rate, coverage, error_rate
 
 # Sweep thresholds on validation set
 print("\nSweeping confidence thresholds on validation set...")
@@ -67,13 +69,15 @@ thresholds = np.arange(0.1, 1.0, 0.05)
 results = []
 
 for threshold in thresholds:
-    acc, abst_rate = evaluate_with_abstention(X_val, y_val_enc, calibrated_model, threshold)
+    acc, abst_rate, coverage, error_rate = evaluate_with_abstention(X_val, y_val_enc, calibrated_model, threshold)
     results.append({
         'threshold': threshold,
         'accuracy': acc,
-        'abstention_rate': abst_rate
+        'abstention_rate': abst_rate,
+        'coverage': coverage,
+        'error_rate': error_rate
     })
-    print(f"  Threshold {threshold:.2f}: Accuracy={acc:.4f}, Abstention={abst_rate:.4f}")
+    print(f"  Threshold {threshold:.2f}: Accuracy={acc:.4f}, Abstention={abst_rate:.4f}, Coverage={coverage:.4f}, Error={error_rate:.4f}")
 
 threshold_df = pd.DataFrame(results)
 
@@ -90,15 +94,17 @@ print(f"  Validation accuracy: {threshold_df.loc[optimal_idx, 'accuracy']:.4f}")
 print(f"  Validation abstention rate: {threshold_df.loc[optimal_idx, 'abstention_rate']:.4f}")
 
 # Plot threshold sweep
-fig, ax1 = plt.subplots(figsize=(10, 6))
+fig, ax1 = plt.subplots(figsize=(12, 6))
 
-ax1.plot(threshold_df['threshold'], threshold_df['accuracy'], 'b-o', label='Accuracy')
-ax1.plot(threshold_df['threshold'], threshold_df['abstention_rate'], 'r-s', label='Abstention Rate')
-ax1.axvline(optimal_threshold, color='g', linestyle='--', label=f'Optimal Threshold ({optimal_threshold:.2f})')
-ax1.set_xlabel('Confidence Threshold')
-ax1.set_ylabel('Rate')
-ax1.set_title('Confidence Threshold Sweep on Validation Set')
-ax1.legend()
+ax1.plot(threshold_df['threshold'], threshold_df['accuracy'], 'b-o', label='Accuracy', linewidth=2)
+ax1.plot(threshold_df['threshold'], threshold_df['abstention_rate'], 'r-s', label='Abstention Rate', linewidth=2)
+ax1.plot(threshold_df['threshold'], threshold_df['coverage'], 'g-^', label='Coverage', linewidth=2)
+ax1.plot(threshold_df['threshold'], threshold_df['error_rate'], 'm-d', label='Error Rate', linewidth=2)
+ax1.axvline(optimal_threshold, color='k', linestyle='--', label=f'Optimal Threshold ({optimal_threshold:.2f})', linewidth=2)
+ax1.set_xlabel('Confidence Threshold', fontsize=12)
+ax1.set_ylabel('Rate', fontsize=12)
+ax1.set_title('Confidence Threshold Sweep on Validation Set', fontsize=14, fontweight='bold')
+ax1.legend(fontsize=10)
 ax1.grid(True, alpha=0.3)
 ax1.set_ylim(0, 1.05)
 
@@ -106,14 +112,21 @@ plt.tight_layout()
 plt.savefig('results/threshold_sweep.png', dpi=300, bbox_inches='tight')
 print("✅ Saved threshold sweep to results/threshold_sweep.png")
 
+# Save comprehensive threshold analysis table
+threshold_df.to_csv('results/threshold_analysis.csv', index=False)
+print("✅ Saved threshold analysis to results/threshold_analysis.csv")
+
 # Apply optimal threshold to test set
 print(f"\nApplying optimal threshold ({optimal_threshold:.2f}) to test set...")
-test_acc, test_abst_rate = evaluate_with_abstention(X_test, y_test_enc, calibrated_model, optimal_threshold)
+test_acc, test_abst_rate, test_coverage, test_error_rate = evaluate_with_abstention(X_test, y_test_enc, calibrated_model, optimal_threshold)
 
 print(f"Test Set Results with Abstention:")
 print(f"  Accuracy (non-abstained): {test_acc:.4f}")
 print(f"  Abstention rate: {test_abst_rate:.4f}")
+print(f"  Coverage: {test_coverage:.4f}")
+print(f"  Error rate (non-abstained): {test_error_rate:.4f}")
 print(f"  Samples abstained: {int(test_abst_rate * len(X_test))} / {len(X_test)}")
+print(f"  Samples covered: {int(test_coverage * len(X_test))} / {len(X_test)}")
 
 # Compare with no abstention baseline
 y_pred_test = calibrated_model.predict(X_test)
@@ -152,8 +165,12 @@ abstention_config = {
     'optimal_threshold': float(optimal_threshold),
     'validation_accuracy': float(threshold_df.loc[optimal_idx, 'accuracy']),
     'validation_abstention_rate': float(threshold_df.loc[optimal_idx, 'abstention_rate']),
+    'validation_coverage': float(threshold_df.loc[optimal_idx, 'coverage']),
+    'validation_error_rate': float(threshold_df.loc[optimal_idx, 'error_rate']),
     'test_accuracy': float(test_acc),
     'test_abstention_rate': float(test_abst_rate),
+    'test_coverage': float(test_coverage),
+    'test_error_rate': float(test_error_rate),
     'baseline_accuracy': float(baseline_acc)
 }
 
@@ -167,8 +184,11 @@ print(f"Optimal confidence threshold: {optimal_threshold:.2f}")
 print(f"Test set performance with abstention:")
 print(f"  Accuracy (non-abstained): {test_acc:.4f}")
 print(f"  Abstention rate: {test_abst_rate:.4f}")
+print(f"  Coverage: {test_coverage:.4f}")
+print(f"  Error rate (non-abstained): {test_error_rate:.4f}")
 print(f"  Improvement over baseline: {test_acc - baseline_acc:+.4f}")
 print(f"Abstention mechanism successfully implemented for uncertainty quantification")
+print(f"Comprehensive threshold analysis saved to results/threshold_analysis.csv")
 print("="*80)
 print("✅ STAGE 6 COMPLETE!")
 print("="*80)

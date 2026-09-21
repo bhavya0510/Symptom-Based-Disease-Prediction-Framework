@@ -224,6 +224,88 @@ result_3 = sequential_questioning(test_symptoms_3, max_questions=3, confidence_t
 print(f"\nTest 3 - Initial symptoms: {test_symptoms_3}")
 print(f"  Result: {result_3}")
 
+# Comprehensive evaluation of sequential questioning on test set
+print("\n" + "="*60)
+print("COMPREHENSIVE SEQUENTIAL QUESTIONING EVALUATION")
+print("="*60)
+
+test_df = pd.read_csv('data/processed/test.csv')
+X_test = test_df.drop(columns=['prognosis'])
+y_test = test_df['prognosis']
+y_test_enc = le.transform(y_test)
+
+# Simulate sequential questioning for various initial symptom counts
+evaluation_results = []
+
+for initial_symptom_count in [1, 2, 3, 5]:
+    print(f"\nEvaluating with {initial_symptom_count} initial symptoms...")
+    
+    questions_needed = []
+    confidence_improvements = []
+    accuracy_improvements = []
+    successful_predictions = 0
+    
+    for idx in range(min(100, len(X_test))):  # Sample subset for efficiency
+        # Get initial symptoms (first N symptoms present)
+        sample_row = X_test.iloc[idx]
+        present_symptoms = sample_row[sample_row == 1].index.tolist()
+        
+        if len(present_symptoms) < initial_symptom_count:
+            continue
+            
+        initial_symptoms = present_symptoms[:initial_symptom_count]
+        
+        # Get initial prediction without sequential questioning
+        initial_vector = {symptom: 0 for symptom in symptom_names}
+        for symptom in initial_symptoms:
+            if symptom in initial_vector:
+                initial_vector[symptom] = 1
+        
+        initial_input = pd.DataFrame([initial_vector])
+        initial_proba = calibrated_model.predict_proba(initial_input)[0]
+        initial_confidence = np.max(initial_proba)
+        initial_prediction = np.argmax(initial_proba)
+        initial_correct = (initial_prediction == y_test_enc[idx])
+        
+        # Run sequential questioning
+        result = sequential_questioning(initial_symptoms, max_questions=5, confidence_threshold=0.7)
+        
+        if result['status'] in ['confident', 'confident_after_questions']:
+            successful_predictions += 1
+            questions_needed.append(len(result['questions_asked']))
+            confidence_improvements.append(result['confidence'] - initial_confidence)
+            
+            # Check if prediction improved
+            final_prediction_correct = (le.classes_.tolist().index(result['prediction']) if isinstance(result['prediction'], str) and result['prediction'] in le.classes_ else result['prediction'] == y_test_enc[idx])
+            if not initial_correct and final_prediction_correct:
+                accuracy_improvements.append(1)
+            elif initial_correct and not final_prediction_correct:
+                accuracy_improvements.append(-1)
+            else:
+                accuracy_improvements.append(0)
+    
+    if questions_needed:
+        evaluation_results.append({
+            'initial_symptoms': initial_symptom_count,
+            'samples_evaluated': len(questions_needed),
+            'avg_questions_needed': np.mean(questions_needed),
+            'std_questions_needed': np.std(questions_needed),
+            'avg_confidence_improvement': np.mean(confidence_improvements),
+            'successful_prediction_rate': successful_predictions / min(100, len(X_test)),
+            'accuracy_improvement_rate': np.mean([acc for acc in accuracy_improvements if acc != 0]) if [acc for acc in accuracy_improvements if acc != 0] else 0
+        })
+        
+        print(f"  Average questions needed: {np.mean(questions_needed):.2f} ± {np.std(questions_needed):.2f}")
+        print(f"  Average confidence improvement: {np.mean(confidence_improvements):.4f}")
+        print(f"  Successful prediction rate: {successful_predictions / min(100, len(X_test)):.4f}")
+
+# Save evaluation results
+if evaluation_results:
+    eval_df = pd.DataFrame(evaluation_results)
+    eval_df.to_csv('results/sequential_questioning_evaluation.csv', index=False)
+    print(f"\n✅ Saved sequential questioning evaluation to results/sequential_questioning_evaluation.csv")
+    print(eval_df.to_string(index=False))
+
 # Create production-ready function for Flask integration
 def get_next_question(current_symptom_vector, current_probabilities):
     """

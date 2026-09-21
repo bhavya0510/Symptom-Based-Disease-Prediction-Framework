@@ -8,6 +8,8 @@ The unique rows are split once, with stratification by diagnosis, into 70% train
 
 `results/per_class_split_counts.csv` documents each diagnosis's total unique patterns, train, validation, and test counts. The total count ranges from 5 to 10; six classes have only 5 unique patterns (AIDS, Acne, Allergy, Gastroenteritis, Heart attack, Urinary tract infection), making held-out results especially unstable.
 
+**Enhanced Analysis (Stage 9)**: `stage9_duplicate_leakage_analysis.py` provides comprehensive analysis of dataset limitations, including pattern frequency distribution, symptom sparsity analysis, and detailed duplicate analysis. This stage quantifies the impact of limited unique patterns on model performance.
+
 ## Evaluation: 5-fold CV + Held-Out Test
 
 The primary model comparison uses stratified 5-fold cross-validation on the 305 unique rows. `results/model_comparison_cv.csv` reports CV F1-Macro as mean ± standard deviation. The held-out test set (46 samples) provides deployment metrics in `results/model_comparison_test.csv`.
@@ -31,7 +33,13 @@ Both achieved 1.0000 test F1-Macro. Soft-voting was selected as the production e
 
 ## Probability calibration
 
-Stage 4 applied isotonic regression calibration to the ensemble using the validation set (46 samples). Brier scores: sigmoid=0.0032, isotonic=0.0000. Isotonic calibration was selected. The calibrated ensemble achieved 1.0000 test accuracy and 1.0000 test F1-Macro.
+Stage 4 applied isotonic regression calibration to the ensemble using the validation set (46 samples). **Enhanced calibration metrics** now include:
+- Brier Score (multiclass)
+- Expected Calibration Error (ECE)
+- Log Loss
+- Reliability diagrams (before/after calibration)
+
+Brier scores: sigmoid=0.0032, isotonic=0.0000. Isotonic calibration was selected. The calibrated ensemble achieved 1.0000 test accuracy and 1.0000 test F1-Macro. Calibration improvements are quantified and visualized in `results/calibration_metrics.csv` and reliability diagrams.
 
 ## Top-K predictions
 
@@ -42,15 +50,40 @@ Stage 5 computed Top-1, Top-3, and Top-5 accuracy on the test set:
 
 ## Uncertainty and abstention
 
-Stage 6 swept confidence thresholds from 0.10 to 0.95 on the validation set. Optimal threshold: 0.10 (minimum due to high model confidence). Test set: 0% abstention rate (model very confident, average confidence=0.9793). The abstention mechanism is implemented but rarely triggers due to dataset characteristics.
+Stage 6 swept confidence thresholds from 0.10 to 0.95 on the validation set. **Enhanced abstention analysis** now includes:
+- Coverage metrics (proportion of samples covered)
+- Error rate analysis (error on confident predictions)
+- Comprehensive threshold sweep table
+- Visualization of accuracy vs. abstention rate vs. coverage
+
+Optimal threshold: 0.10 (minimum due to high model confidence). Test set: 0% abstention rate (model very confident, average confidence=0.9793). The abstention mechanism is implemented but rarely triggers due to dataset characteristics. Full analysis available in `results/threshold_analysis.csv`.
 
 ## Sequential symptom questioning
 
 Stage 7 computed mutual information for 132 symptoms × 41 diseases using training data. A greedy information-gain selector picks the most informative next symptom when confidence is below threshold. The system is stateful and supports up to 5 follow-up questions per session.
 
+**Enhanced evaluation (Stage 7)**: Now includes:
+- Average questions needed for different initial symptom counts
+- Confidence improvement metrics from sequential questioning
+- Accuracy impact analysis
+- Comprehensive evaluation on test set samples
+
+Evaluation results are saved in `results/sequential_questioning_evaluation.csv`.
+
 ## SHAP explainability
 
 Stage 8 fitted a SHAP TreeExplainer on the XGBoost component of the ensemble. Global summary plots show the most important symptoms (phlegm, acute_liver_failure, irritability, blurred_and_distorted_vision, swelling_of_stomach). Per-prediction explanations return top contributing symptoms with direction (positive/negative impact).
+
+## Ablation study (Stage 10 - NEW)
+
+`stage10_ablation_study.py` systematically evaluates the contribution of each system component:
+1. Baseline (best single model)
+2. Ensemble without calibration
+3. Ensemble with calibration
+4. Ensemble with calibration + abstention
+5. Full system (all components)
+
+This quantifies the incremental improvement from each enhancement and helps understand which components provide the most value. Results are saved in `results/ablation_study.csv` with visualizations in `results/ablation_study_visualization.png`.
 
 ## Production deployment
 
@@ -66,6 +99,7 @@ All artifacts are in `HealthGuardAI/backend/artifacts/`:
 - `mutual_information.pkl`: MI matrix for sequential questioning
 - `shap_system.pkl`: SHAP explainer and XGBoost model
 - `abstention_config.pkl`: Optimal confidence threshold (0.10)
+- **NEW**: Enhanced results files with calibration metrics, threshold analysis, sequential questioning evaluation, duplicate analysis, and ablation study
 
 ## Limitations
 

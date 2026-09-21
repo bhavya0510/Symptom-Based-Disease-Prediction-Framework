@@ -1,9 +1,9 @@
 """
 STAGE 3: Proposed Ensemble Model
 Build and evaluate ensemble models:
-- Soft-voting ensemble (Random Forest + XGBoost)
+- Soft-voting ensemble (Random Forest + XGBoost) using weighted probability averaging
 - Stacking ensemble (RF + XGBoost as base learners, Logistic Regression as meta-learner)
-Compare both and select the best performer.
+Compare both and select the best performer for final system.
 """
 import pandas as pd
 import numpy as np
