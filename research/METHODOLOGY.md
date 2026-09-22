@@ -8,7 +8,11 @@ The unique rows are split once, with stratification by diagnosis, into 70% train
 
 `results/per_class_split_counts.csv` documents each diagnosis's total unique patterns, train, validation, and test counts. The total count ranges from 5 to 10; six classes have only 5 unique patterns (AIDS, Acne, Allergy, Gastroenteritis, Heart attack, Urinary tract infection), making held-out results especially unstable.
 
+**Generalization reporting scope**: The project reports representative class support counts and the overall dataset limitation, but it does not claim a full per-class performance table because the test split contains only 46 total samples and most classes contribute 1–2 examples. The class-support summary is therefore used to document pattern scarcity and generalization risk rather than to infer stable per-disease accuracy estimates.
+
 **Enhanced Analysis (Stage 9)**: `stage9_duplicate_leakage_analysis.py` provides comprehensive analysis of dataset limitations, including pattern frequency distribution, symptom sparsity analysis, and detailed duplicate analysis. This stage quantifies the impact of limited unique patterns on model performance.
+
+**Reproducibility and evidence**: The authoritative numerical claims in this repository are the CSV and PNG artifacts saved under `research/results/` by the stage scripts. The documentation reports only metrics directly produced by those scripts; it does not claim that every final figure was regenerated in a separate pass beyond the recorded artifacts.
 
 ## Evaluation: 5-fold CV + Held-Out Test
 

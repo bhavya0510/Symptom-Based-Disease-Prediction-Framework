@@ -36,7 +36,8 @@ An early-stage research framework for symptom-based disease prediction with expl
    - Demonstrated quantitative improvement in probability calibration.
 
 5. **Explainable AI (SHAP Interpretability)**
-   - Integrated SHAP (`TreeExplainer`) to compute local feature attribution for every individual prediction, highlighting positive (aggravating) and negative (mitigating) symptom impacts.
+   - Integrated SHAP (`TreeExplainer`) to compute XGBoost component-level local feature attribution for every individual prediction, highlighting positive (aggravating) and negative (mitigating) symptom impacts.
+   - Note: This provides XGBoost component-level SHAP explanations, not explanations for the entire RF + XGBoost calibrated ensemble.
 
 6. **Top-K Differential Diagnosis Metrics**
    - Provides ranked candidate diseases (Top-1, Top-3, Top-5) alongside calibrated confidence scores.
@@ -94,6 +95,24 @@ An early-stage research framework for symptom-based disease prediction with expl
 - XGBoost shows realistic variance (0.9081 ± 0.0479), indicating some genuine learning challenge
 - These results represent **pattern-matching performance**, not clinical diagnostic accuracy
 - See Stage 9 (Duplicate/Leakage Analysis) for detailed dataset limitations
+
+### Representative Generalization Summary
+The deduplicated dataset contains **305 unique symptom patterns** across **41 disease classes**. The held-out test split contains only **46 total examples**, and most classes contribute only **1–2 test samples**. Because of this, the project reports support counts and representative class summaries rather than claiming a full per-class accuracy table for every disease.
+
+| Disease | Unique patterns | Test samples |
+|:---|---:|---:|
+| Fungal infection | 6 | 1 |
+| Allergy | 5 | 1 |
+| GERD | 7 | 1 |
+| Chronic cholestasis | 8 | 1 |
+| Drug Reaction | 6 | 1 |
+| Peptic ulcer diseae | 7 | 1 |
+| AIDS | 5 | 1 |
+| Diabetes | 9 | 1 |
+| Gastroenteritis | 5 | 1 |
+| Bronchial Asthma | 7 | 1 |
+
+This summary is intended to document generalization limits and support concentration; it is not a claim of reliable class-wise performance for every disease in the test split.
 
 ---
 
