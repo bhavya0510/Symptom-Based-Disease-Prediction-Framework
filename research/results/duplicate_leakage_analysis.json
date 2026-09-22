@@ -1,0 +1,31 @@
+{
+  "dataset_info": {
+    "total_samples": 305,
+    "unique_patterns": 305,
+    "symptom_features": 132,
+    "disease_classes": 41,
+    "exact_duplicates_removed": 0
+  },
+  "pattern_analysis": {
+    "min_patterns_per_disease": 5,
+    "max_patterns_per_disease": 10,
+    "diseases_with_single_pattern": 0,
+    "diseases_with_3_or_fewer_patterns": 0
+  },
+  "split_overlap": {
+    "train_val_overlap": 0,
+    "train_test_overlap": 0,
+    "val_test_overlap": 0
+  },
+  "sparsity_analysis": {
+    "overall_sparsity": 0.9421013412816691,
+    "avg_symptoms_per_sample": 7.642622950819672,
+    "most_common_symptom": "fatigue",
+    "most_common_symptom_count": 134
+  },
+  "pattern_frequency": {
+    "patterns_appearing_once": 305,
+    "patterns_appearing_2_to_5_times": 0,
+    "patterns_appearing_more_than_5_times": 0
+  }
+}

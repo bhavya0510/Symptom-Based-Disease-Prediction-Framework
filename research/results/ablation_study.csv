@@ -1,0 +1,6 @@
+Configuration,Description,Accuracy,Precision_Macro,Recall_Macro,F1_Macro,F1_Weighted,Brier_Score,ECE,Log_Loss,Abstention_Rate,Coverage,Accuracy_With_Abstention,Avg_Questions_Needed,Sequential_Improvement
+Baseline (Single Best Model),Best single baseline model without enhancements,1.0,1.0,1.0,1.0,1.0,,,,,,,,
+Ensemble (No Calibration),RF+XGBoost ensemble without probability calibration,1.0,1.0,1.0,1.0,1.0,,,,,,,,
+Ensemble + Calibration,RF+XGBoost ensemble with isotonic calibration,1.0,1.0,1.0,1.0,1.0,5.156243988375842e-05,0.01413057197769889,0.014797856192230497,,,,,
+Ensemble + Calibration + Abstention,Calibrated ensemble with confidence-based abstention,1.0,1.0,1.0,1.0,1.0,5.156243988375842e-05,0.01413057197769889,0.014797856192230497,0.0,1.0,1.0,,
+Full System (All Components),"Complete system with calibration, abstention, and sequential questioning",1.0,1.0,1.0,1.0,1.0,5.156243988375842e-05,0.01413057197769889,0.014797856192230497,0.0,1.0,1.0,0.845029470121382,0.9921875

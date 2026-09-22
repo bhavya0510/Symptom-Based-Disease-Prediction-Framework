@@ -1,0 +1,4 @@
+{
+  "selected_method": "isotonic",
+  "selection_metric": "validation_brier_score"
+}

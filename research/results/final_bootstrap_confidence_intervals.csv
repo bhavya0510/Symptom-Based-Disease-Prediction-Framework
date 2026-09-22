@@ -1,0 +1,7 @@
+Metric,Estimate,CI_Lower_95,CI_Upper_95,CI_95,Selection_Stage
+Accuracy,1.0,1.0,1.0,"[1.0000, 1.0000]",final_test_set_only
+Macro_F1,1.0,1.0,1.0,"[1.0000, 1.0000]",final_test_set_only
+Weighted_F1,1.0,1.0,1.0,"[1.0000, 1.0000]",final_test_set_only
+Brier_Score,5.156243988375842e-05,9.00779718734893e-06,0.00011003561976075362,"[0.0000, 0.0001]",final_test_set_only
+ECE,0.01413057197769889,0.005743769739383708,0.024602257851167816,"[0.0057, 0.0246]",final_test_set_only
+Log_Loss,0.014797856192230497,0.005836134552548455,0.02599751330837218,"[0.0058, 0.0260]",final_test_set_only

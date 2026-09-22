@@ -1,2 +1,2 @@
-Model,Accuracy,Precision_Macro,Recall_Macro,F1_Macro,F1_Weighted
-Final Production Calibrated Ensemble,1.0,1.0,1.0,1.0,1.0
+Model,Calibration_Method,Accuracy,Precision_Macro,Recall_Macro,F1_Macro,F1_Weighted,Brier_Score,ECE,Log_Loss
+Final Production Calibrated Ensemble,isotonic,1.0,1.0,1.0,1.0,1.0,5.156243988375842e-05,0.01413057197769889,0.014797856192230497

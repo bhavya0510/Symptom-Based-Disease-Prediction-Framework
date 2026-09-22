@@ -8,8 +8,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from collections import Counter
+import os
+from pathlib import Path
 import warnings
 warnings.filterwarnings('ignore')
+
+RESEARCH_DIR = Path(__file__).resolve().parent
+os.chdir(RESEARCH_DIR)
 
 print("=" * 80)
 print("STAGE 9: Duplicate and Data Leakage Analysis")
@@ -183,17 +188,17 @@ print("="*60)
 
 analysis_report = {
     'dataset_info': {
-        'total_samples': len(clean_df),
-        'unique_patterns': len(symptom_patterns),
-        'symptom_features': len(symptom_cols),
-        'disease_classes': clean_df['prognosis'].nunique(),
-        'exact_duplicates_removed': exact_duplicates
+        'total_samples': int(len(clean_df)),
+        'unique_patterns': int(len(symptom_patterns)),
+        'symptom_features': int(len(symptom_cols)),
+        'disease_classes': int(clean_df['prognosis'].nunique()),
+        'exact_duplicates_removed': int(exact_duplicates)
     },
     'pattern_analysis': {
-        'min_patterns_per_disease': pattern_counts.min(),
-        'max_patterns_per_disease': pattern_counts.max(),
-        'diseases_with_single_pattern': (pattern_counts == 1).sum(),
-        'diseases_with_3_or_fewer_patterns': (pattern_counts <= 3).sum()
+        'min_patterns_per_disease': int(pattern_counts.min()),
+        'max_patterns_per_disease': int(pattern_counts.max()),
+        'diseases_with_single_pattern': int((pattern_counts == 1).sum()),
+        'diseases_with_3_or_fewer_patterns': int((pattern_counts <= 3).sum())
     },
     'split_overlap': {
         'train_val_overlap': int(train_val_overlap),
@@ -203,7 +208,7 @@ analysis_report = {
     'sparsity_analysis': {
         'overall_sparsity': float(sparsity),
         'avg_symptoms_per_sample': float(avg_symptoms_per_sample),
-        'most_common_symptom': symptom_frequencies.index[0],
+        'most_common_symptom': str(symptom_frequencies.index[0]),
         'most_common_symptom_count': int(symptom_frequencies.iloc[0])
     },
     'pattern_frequency': {
@@ -217,6 +222,74 @@ import json
 with open('results/duplicate_leakage_analysis.json', 'w') as f:
     json.dump(analysis_report, f, indent=2)
 print("✅ Saved analysis report to results/duplicate_leakage_analysis.json")
+
+# Create generalization table with representative disease classes and actual class-wise metrics
+print("\nCreating generalization table with representative disease classes and test-set metrics...")
+
+pattern_data = pd.read_csv('results/per_class_split_counts.csv')
+pattern_data = pattern_data.rename(columns={'Disease': 'Disease/Class'})
+
+# Use the final production model for per-class metrics on the held-out test set.
+try:
+    model = joblib.load('results/final_calibrated_ensemble.pkl')
+    test_df = pd.read_csv('data/processed/test.csv')
+    X_test = test_df.drop(columns=['prognosis'])
+    y_true = test_df['prognosis']
+    y_pred = model.predict(X_test)
+    label_set = sorted(y_true.unique())
+    per_class_rows = []
+    for disease in label_set:
+        true_mask = (y_true == disease)
+        pred_mask = (y_pred == disease)
+        tp = np.sum(true_mask & pred_mask)
+        support = int(true_mask.sum())
+        if support == 0:
+            acc = np.nan
+            precision = np.nan
+            recall = np.nan
+            f1 = np.nan
+        else:
+            acc = float(np.mean(y_pred[true_mask] == disease))
+            precision = float(tp / max(np.sum(pred_mask), 1))
+            recall = float(tp / support)
+            f1 = float(2 * precision * recall / max((precision + recall), 1e-12))
+        per_class_rows.append({
+            'Disease/Class': disease,
+            'Unique Patterns/Support': int(pattern_data.loc[pattern_data['Disease/Class'] == disease, 'Total_Unique_Patterns'].iloc[0]) if disease in pattern_data['Disease/Class'].values else support,
+            'Test Samples': support,
+            'Class-wise Accuracy': acc,
+            'Precision': precision,
+            'Recall': recall,
+            'F1': f1,
+        })
+    generalization_df = pd.DataFrame(per_class_rows).sort_values('Test Samples', ascending=False)
+except Exception:
+    generalization_df = pattern_data.rename(columns={'Total_Unique_Patterns': 'Unique Patterns/Support', 'Test': 'Test Samples'}).copy()
+    generalization_df['Class-wise Accuracy'] = np.nan
+    generalization_df['Precision'] = np.nan
+    generalization_df['Recall'] = np.nan
+    generalization_df['F1'] = np.nan
+    generalization_df = generalization_df[[ 'Disease/Class', 'Unique Patterns/Support', 'Test Samples', 'Class-wise Accuracy', 'Precision', 'Recall', 'F1' ]] 
+
+representative_classes = generalization_df.head(10).copy()
+representative_classes.to_csv('results/generalization_table.csv', index=False)
+print("✅ Saved generalization table to results/generalization_table.csv")
+
+print("\n" + "="*60)
+print("GENERALIZATION TABLE - Representative Disease Classes")
+print("="*60)
+print(representative_classes.to_string(index=False))
+
+print("\n" + "="*60)
+print("DATASET LIMITATIONS - Generalization Concerns")
+print("="*60)
+print(f"The dataset contains approximately {len(symptom_patterns)} unique symptom patterns")
+print(f"for {clean_df['prognosis'].nunique()} disease classes.")
+print(f"\nThis limited pattern diversity affects how broadly the results can be generalized:")
+print(f"  - Many disease classes have ≤3 unique patterns")
+print(f"  - Perfect model scores (1.0) likely reflect pattern memorization")
+print(f"  - Results represent pattern-matching performance, not clinical diagnostic accuracy")
+print(f"  - External validation on independent datasets is needed for generalization")
 
 # Summary and recommendations
 print("\n" + "="*80)
@@ -242,5 +315,6 @@ print(f"  2. Report results as pattern-matching performance, not clinical diagno
 print(f"  3. Collect more diverse data to improve generalization")
 print(f"  4. Consider data augmentation techniques")
 print("="*80)
+
 print("✅ STAGE 9 COMPLETE!")
 print("="*80)

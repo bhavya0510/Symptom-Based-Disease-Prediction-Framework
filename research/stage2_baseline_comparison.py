@@ -25,8 +25,12 @@ from sklearn.preprocessing import LabelEncoder
 import xgboost as xgb
 import joblib
 import os
+from pathlib import Path
 import warnings
 warnings.filterwarnings('ignore')
+
+RESEARCH_DIR = Path(__file__).resolve().parent
+os.chdir(RESEARCH_DIR)
 
 print("=" * 80)
 print("STAGE 2: Baseline Model Comparison (Leakage-Free)")

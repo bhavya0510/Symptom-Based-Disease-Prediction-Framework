@@ -11,8 +11,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score
 import joblib
+import os
+from pathlib import Path
 import warnings
 warnings.filterwarnings('ignore')
+
+RESEARCH_DIR = Path(__file__).resolve().parent
+os.chdir(RESEARCH_DIR)
 
 print("=" * 80)
 print("STAGE 6: Uncertainty / Abstention")
@@ -111,6 +116,43 @@ ax1.set_ylim(0, 1.05)
 plt.tight_layout()
 plt.savefig('results/threshold_sweep.png', dpi=300, bbox_inches='tight')
 print("✅ Saved threshold sweep to results/threshold_sweep.png")
+
+# Create confidence/abstention curve figure as required by professor
+fig, ax = plt.subplots(figsize=(12, 6))
+
+# Use a finer threshold range for the required figure
+fine_thresholds = np.arange(0.10, 0.96, 0.05)
+fine_results = []
+
+for threshold in fine_thresholds:
+    acc, abst_rate, coverage, error_rate = evaluate_with_abstention(X_val, y_val_enc, calibrated_model, threshold)
+    fine_results.append({
+        'threshold': threshold,
+        'accuracy': acc,
+        'abstention_rate': abst_rate,
+        'coverage': coverage,
+        'error_rate': error_rate
+    })
+
+fine_df = pd.DataFrame(fine_results)
+
+# Plot the required confidence/abstention curve
+ax.plot(fine_df['threshold'], fine_df['coverage'], 'b-o', label='Coverage', linewidth=2, markersize=8)
+ax.plot(fine_df['threshold'], fine_df['abstention_rate'], 'r-s', label='Abstention Rate', linewidth=2, markersize=8)
+ax.plot(fine_df['threshold'], fine_df['accuracy'], 'g-^', label='Accuracy', linewidth=2, markersize=8)
+ax.axvline(optimal_threshold, color='k', linestyle='--', label=f'Optimal Threshold ({optimal_threshold:.2f})', linewidth=2)
+
+ax.set_xlabel('Confidence Threshold', fontsize=12)
+ax.set_ylabel('Rate', fontsize=12)
+ax.set_title('Confidence/Abstention Curve (Validation Set)', fontsize=14, fontweight='bold')
+ax.legend(fontsize=10)
+ax.grid(True, alpha=0.3)
+ax.set_xlim([0.10, 0.95])
+ax.set_ylim([0, 1.05])
+
+plt.tight_layout()
+plt.savefig('results/confidence_abstention_curve.png', dpi=300, bbox_inches='tight')
+print("✅ Saved confidence/abstention curve to results/confidence_abstention_curve.png")
 
 # Save comprehensive threshold analysis table
 threshold_df.to_csv('results/threshold_analysis.csv', index=False)

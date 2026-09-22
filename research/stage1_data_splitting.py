@@ -16,7 +16,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.model_selection import train_test_split, StratifiedKFold
 import os
+from pathlib import Path
 import joblib
+
+RESEARCH_DIR = Path(__file__).resolve().parent
+os.chdir(RESEARCH_DIR)
 
 print("=" * 80)
 print("STAGE 1: Data Cleaning & Splitting (Leakage-Free)")

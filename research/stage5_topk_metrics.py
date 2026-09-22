@@ -7,8 +7,13 @@ import pandas as pd
 import numpy as np
 from sklearn.metrics import accuracy_score
 import joblib
+import os
+from pathlib import Path
 import warnings
 warnings.filterwarnings('ignore')
+
+RESEARCH_DIR = Path(__file__).resolve().parent
+os.chdir(RESEARCH_DIR)
 
 print("=" * 80)
 print("STAGE 5: Top-K Prediction Metrics")

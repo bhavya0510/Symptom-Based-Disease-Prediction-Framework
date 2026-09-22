@@ -13,8 +13,13 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (accuracy_score, precision_score, recall_score, 
                              f1_score, classification_report)
 import joblib
+import os
+from pathlib import Path
 import warnings
 warnings.filterwarnings('ignore')
+
+RESEARCH_DIR = Path(__file__).resolve().parent
+os.chdir(RESEARCH_DIR)
 
 print("=" * 80)
 print("STAGE 3: Proposed Ensemble Model")

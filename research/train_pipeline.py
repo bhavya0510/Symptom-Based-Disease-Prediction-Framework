@@ -1,14 +1,20 @@
 """
 Training Pipeline - Runs Stages 1-10 end-to-end and saves production artifacts
 This script should be run to train/retrain the model and generate all required artifacts.
-Enhanced with rigorous evaluation: calibration metrics, abstention analysis, sequential questioning evaluation, duplicate analysis, and ablation study.
+Enhanced with rigorous evaluation: calibration methodology with validation-based selection, 
+confidence intervals, abstention analysis, sequential questioning with random baseline, 
+duplicate analysis, ablation study, and required figures.
 """
 import os
 import sys
 import subprocess
+from pathlib import Path
+
+RESEARCH_DIR = Path(__file__).resolve().parent
+os.chdir(RESEARCH_DIR)
 
 print("=" * 80)
-print("TRAINING PIPELINE - Stages 1-10")
+print("TRAINING PIPELINE - Stages 1-10 with Professor-Requested Enhancements")
 print("=" * 80)
 
 # Run Stage 1: Data Cleaning & Splitting
@@ -81,6 +87,13 @@ print("="*60)
 result = subprocess.run([sys.executable, 'stage10_ablation_study.py'], check=True)
 print(f"Stage 10 completed with exit code: {result.returncode}")
 
+# Generate System Architecture Figure
+print("\n" + "="*60)
+print("GENERATING SYSTEM ARCHITECTURE FIGURE")
+print("="*60)
+result = subprocess.run([sys.executable, 'generate_architecture_figure.py'], check=True)
+print(f"Architecture figure generation completed with exit code: {result.returncode}")
+
 # Copy artifacts to backend directory
 print("\n" + "="*60)
 print("Copying artifacts to backend directory")
@@ -100,7 +113,8 @@ artifacts_to_copy = [
     ('results/mutual_information.pkl', 'mutual_information.pkl'),
     ('results/shap_system.pkl', 'shap_system.pkl'),
     ('results/abstention_config.pkl', 'abstention_config.pkl'),
-    ('data/processed/disease_data_clean.csv', 'disease_data_clean.csv')
+    ('data/processed/disease_data_clean.csv', 'disease_data_clean.csv'),
+    ('results/generalization_table.csv', 'generalization_table.csv')
 ]
 
 for src, dest in artifacts_to_copy:
@@ -111,14 +125,36 @@ for src, dest in artifacts_to_copy:
         print(f"⚠️  Warning: {src} not found")
 
 # Create metadata file
+try:
+    calibrated_metrics = pd.read_csv('results/final_calibrated_metrics.csv')
+    calibration_method = calibrated_metrics['Calibration_Method'].iloc[0] if 'Calibration_Method' in calibrated_metrics.columns else 'isotonic'
+    
+    # Extract confidence intervals if available
+    confidence_intervals = {}
+    if 'Accuracy_CI_Lower' in calibrated_metrics.columns:
+        confidence_intervals['accuracy'] = [float(calibrated_metrics['Accuracy_CI_Lower'].iloc[0]), float(calibrated_metrics['Accuracy_CI_Upper'].iloc[0])]
+    if 'Brier_Score_CI_Lower' in calibrated_metrics.columns:
+        confidence_intervals['brier_score'] = [float(calibrated_metrics['Brier_Score_CI_Lower'].iloc[0]), float(calibrated_metrics['Brier_Score_CI_Upper'].iloc[0])]
+    if 'ECE_CI_Lower' in calibrated_metrics.columns:
+        confidence_intervals['ece'] = [float(calibrated_metrics['ECE_CI_Lower'].iloc[0]), float(calibrated_metrics['ECE_CI_Upper'].iloc[0])]
+    if 'Log_Loss_CI_Lower' in calibrated_metrics.columns:
+        confidence_intervals['log_loss'] = [float(calibrated_metrics['Log_Loss_CI_Lower'].iloc[0]), float(calibrated_metrics['Log_Loss_CI_Upper'].iloc[0])]
+    if 'F1_Macro_CI_Lower' in calibrated_metrics.columns:
+        confidence_intervals['f1_macro'] = [float(calibrated_metrics['F1_Macro_CI_Lower'].iloc[0]), float(calibrated_metrics['F1_Macro_CI_Upper'].iloc[0])]
+except Exception as e:
+    print(f"Warning: Could not load calibrated metrics: {e}")
+    calibration_method = 'isotonic'
+    confidence_intervals = {}
+
 metadata = {
     'symptom_names': pd.read_csv('data/processed/train.csv').drop(columns=['prognosis']).columns.tolist(),
     'disease_classes': joblib.load('results/label_encoder.pkl').classes_.tolist(),
     'n_classes': len(joblib.load('results/label_encoder.pkl').classes_),
     'n_features': 132,
     'model_type': 'Calibrated Ensemble (RF + XGBoost)',
-    'calibration_method': 'isotonic',
-    'abstention_threshold': float(joblib.load('results/abstention_config.pkl')['optimal_threshold'])
+    'calibration_method': calibration_method,
+    'abstention_threshold': float(joblib.load('results/abstention_config.pkl')['optimal_threshold']),
+    'confidence_intervals': confidence_intervals
 }
 
 joblib.dump(metadata, '../HealthGuardAI/backend/artifacts/metadata.pkl')

@@ -3,12 +3,17 @@ STAGE 10: Ablation Study
 Evaluate the contribution of each component to overall system performance.
 Tests: baseline models, with/without calibration, with/without abstention, with/without sequential questioning.
 """
+import os
+from pathlib import Path
 import pandas as pd
 import numpy as np
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 import joblib
 import warnings
 warnings.filterwarnings('ignore')
+
+RESEARCH_DIR = Path(__file__).resolve().parent
+os.chdir(RESEARCH_DIR)
 
 print("=" * 80)
 print("STAGE 10: Ablation Study")
@@ -166,13 +171,18 @@ for config in ablation_configs:
     sequential_improvement = None
     
     if config['use_sequential']:
-        # Simplified sequential questioning evaluation
-        from scipy.stats import entropy
-        
-        # Estimate how many samples would benefit from sequential questioning
-        uncertain_samples = np.max(y_pred_proba, axis=1) < 0.7
-        avg_questions_needed = 2.5  # Estimated based on Stage 7 results
-        sequential_improvement = uncertain_samples.mean()  # Proportion that could benefit
+        seq_df = pd.read_csv('results/sequential_questioning_evaluation.csv')
+        if not seq_df.empty and 'method' in seq_df.columns:
+            mi_rows = seq_df[seq_df['method'] == 'MI']
+            if not mi_rows.empty:
+                avg_questions_needed = float(mi_rows['avg_questions_needed'].mean())
+                sequential_improvement = float(mi_rows['final_accuracy'].mean())
+            else:
+                avg_questions_needed = None
+                sequential_improvement = None
+        else:
+            avg_questions_needed = None
+            sequential_improvement = None
     
     # Store results
     result = {
@@ -253,57 +263,49 @@ for i, row in ablation_df.iterrows():
             brier_improvement = baseline_brier - row['Brier_Score']  # Lower is better
             print(f"  Brier Score improvement: {brier_improvement:+.4f} (lower is better)")
 
-# Generate visualization
+# Generate visualization focused on calibration metrics (Brier, ECE, Log Loss)
 import matplotlib.pyplot as plt
 
-fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
-# F1-Macro comparison
-ax1 = axes[0, 0]
-ax1.bar(range(len(ablation_df)), ablation_df['F1_Macro'], color='steelblue')
-ax1.set_xticks(range(len(ablation_df)))
-ax1.set_xticklabels(ablation_df['Configuration'], rotation=45, ha='right', fontsize=8)
-ax1.set_ylabel('F1-Macro Score')
-ax1.set_title('F1-Macro Score by Configuration')
-ax1.grid(True, alpha=0.3)
-ax1.set_ylim([0.9, 1.0])
+# Filter to only calibrated configurations for these metrics
+calibrated_configs = ablation_df[ablation_df['Brier_Score'].notna()].copy()
 
-# Accuracy comparison
-ax2 = axes[0, 1]
-ax2.bar(range(len(ablation_df)), ablation_df['Accuracy'], color='coral')
-ax2.set_xticks(range(len(ablation_df)))
-ax2.set_xticklabels(ablation_df['Configuration'], rotation=45, ha='right', fontsize=8)
-ax2.set_ylabel('Accuracy')
-ax2.set_title('Accuracy by Configuration')
-ax2.grid(True, alpha=0.3)
-ax2.set_ylim([0.9, 1.0])
+if len(calibrated_configs) > 0:
+    # Brier Score comparison
+    ax1 = axes[0]
+    ax1.bar(range(len(calibrated_configs)), calibrated_configs['Brier_Score'], color='lightgreen')
+    ax1.set_xticks(range(len(calibrated_configs)))
+    ax1.set_xticklabels(calibrated_configs['Configuration'], rotation=45, ha='right', fontsize=8)
+    ax1.set_ylabel('Brier Score (lower is better)')
+    ax1.set_title('Brier Score by Configuration', fontsize=12, fontweight='bold')
+    ax1.grid(True, alpha=0.3)
 
-# Brier Score comparison (for calibrated models)
-ax3 = axes[1, 0]
-calibrated_mask = ablation_df['Brier_Score'].notna()
-if calibrated_mask.sum() > 0:
-    ax3.bar(range(len(ablation_df))[calibrated_mask], ablation_df.loc[calibrated_mask, 'Brier_Score'], color='lightgreen')
-    ax3.set_xticks(range(len(ablation_df)))
-    ax3.set_xticklabels(ablation_df['Configuration'], rotation=45, ha='right', fontsize=8)
-    ax3.set_ylabel('Brier Score (lower is better)')
-    ax3.set_title('Brier Score by Configuration (Calibrated Models)')
+    # ECE comparison
+    ax2 = axes[1]
+    ax2.bar(range(len(calibrated_configs)), calibrated_configs['ECE'], color='lightblue')
+    ax2.set_xticks(range(len(calibrated_configs)))
+    ax2.set_xticklabels(calibrated_configs['Configuration'], rotation=45, ha='right', fontsize=8)
+    ax2.set_ylabel('Expected Calibration Error (lower is better)')
+    ax2.set_title('ECE by Configuration', fontsize=12, fontweight='bold')
+    ax2.grid(True, alpha=0.3)
+
+    # Log Loss comparison
+    ax3 = axes[2]
+    ax3.bar(range(len(calibrated_configs)), calibrated_configs['Log_Loss'], color='lightcoral')
+    ax3.set_xticks(range(len(calibrated_configs)))
+    ax3.set_xticklabels(calibrated_configs['Configuration'], rotation=45, ha='right', fontsize=8)
+    ax3.set_ylabel('Log Loss (lower is better)')
+    ax3.set_title('Log Loss by Configuration', fontsize=12, fontweight='bold')
     ax3.grid(True, alpha=0.3)
-
-# Coverage comparison (for abstention models)
-ax4 = axes[1, 1]
-abstention_mask = ablation_df['Coverage'].notna()
-if abstention_mask.sum() > 0:
-    ax4.bar(range(len(ablation_df))[abstention_mask], ablation_df.loc[abstention_mask, 'Coverage'], color='plum')
-    ax4.set_xticks(range(len(ablation_df)))
-    ax4.set_xticklabels(ablation_df['Configuration'], rotation=45, ha='right', fontsize=8)
-    ax4.set_ylabel('Coverage')
-    ax4.set_title('Coverage by Configuration (Abstention Models)')
-    ax4.grid(True, alpha=0.3)
-    ax4.set_ylim([0, 1])
+else:
+    # If no calibrated models, show message
+    for ax in axes:
+        ax.text(0.5, 0.5, 'No calibrated models available', ha='center', va='center', transform=ax.transAxes)
 
 plt.tight_layout()
 plt.savefig('results/ablation_study_visualization.png', dpi=300, bbox_inches='tight')
-print("✅ Saved ablation study visualization")
+print("✅ Saved ablation study visualization (focused on calibration metrics)")
 
 print("\n" + "="*80)
 print("STAGE 10 SUMMARY")

@@ -1,18 +1,26 @@
 """
 STAGE 8: Explainable AI (SHAP)
 Integrate SHAP for model explainability:
-- Fit TreeExplainer on XGBoost component of ensemble
+- Fit TreeExplainer on XGBoost component of ensemble (component-level SHAP)
 - Generate global SHAP summary plots
 - Create per-prediction SHAP explanations
 - Implement production function for real-time explanations
+
+Note: This implementation provides XGBoost component-level SHAP explanations.
+It does not explain the entire RF + XGBoost calibrated ensemble.
 """
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import shap
 import joblib
+import os
+from pathlib import Path
 import warnings
 warnings.filterwarnings('ignore')
+
+RESEARCH_DIR = Path(__file__).resolve().parent
+os.chdir(RESEARCH_DIR)
 
 print("=" * 80)
 print("STAGE 8: SHAP Explainable AI Integration")
@@ -235,13 +243,15 @@ else:
 print(f"\n" + "="*80)
 print("STAGE 8 SUMMARY")
 print("="*80)
-print(f"SHAP explainability system implemented:")
-print(f"  - TreeExplainer fitted on XGBoost model")
+print(f"XGBoost component-level SHAP explainability system implemented:")
+print(f"  - TreeExplainer fitted on XGBoost model (component-level)")
 print(f"  - Global summary plots generated")
 print(f"  - Per-prediction explanation function implemented")
 print(f"  - Example explanations for 3 disease cases")
 print(f"  - Production-ready SHAP system saved")
 print(f"  - Top 10 most important symptoms identified")
+print(f"  - Note: These are XGBoost component-level SHAP explanations")
+print(f"  - Note: Does not explain the entire RF + XGBoost calibrated ensemble")
 print("="*80)
 print("✅ STAGE 8 COMPLETE!")
 print("="*80)
