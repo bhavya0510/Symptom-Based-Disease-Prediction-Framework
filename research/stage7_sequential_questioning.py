@@ -264,9 +264,9 @@ print(f"\nTest 3 - Initial symptoms: {test_symptoms_3}")
 print(f"  MI Result: {result_3_mi}")
 print(f"  Random Result: {result_3_random}")
 
-# Comprehensive evaluation of sequential questioning on test set
+# Comprehensive paired evaluation of sequential questioning on test set
 print("\n" + "="*60)
-print("COMPREHENSIVE SEQUENTIAL QUESTIONING EVALUATION")
+print("COMPREHENSIVE PAIRED SEQUENTIAL QUESTIONING EVALUATION")
 print("="*60)
 
 test_df = pd.read_csv('data/processed/test.csv')
@@ -274,84 +274,141 @@ X_test = test_df.drop(columns=['prognosis'])
 y_test = test_df['prognosis']
 y_test_enc = le.transform(y_test)
 
-# Simulate sequential questioning for various initial symptom counts and methods
-evaluation_results = []
+from scipy.stats import ttest_rel, wilcoxon
 
-for method in ['MI', 'Random']:
-    for initial_symptom_count in [1, 2, 3, 5]:
-        print(f"\nEvaluating {method} with {initial_symptom_count} initial symptoms...")
+evaluation_results = []
+stat_test_results = []
+
+for initial_symptom_count in [1, 2, 3, 5]:
+    print(f"\nEvaluating paired MI vs Random with {initial_symptom_count} initial symptoms...")
+    
+    paired_cases = []
+    
+    for idx in range(len(X_test)):
+        sample_row = X_test.iloc[idx]
+        present_symptoms = sample_row[sample_row == 1].index.tolist()
         
-        questions_needed = []
-        confidence_improvements = []
-        accuracy_improvements = []
-        successful_predictions = 0
-        final_accuracies = []
+        if len(present_symptoms) < initial_symptom_count:
+            continue
+            
+        initial_symptoms = present_symptoms[:initial_symptom_count]
         
-        for idx in range(min(100, len(X_test))):  # Sample subset for efficiency
-            # Get initial symptoms (first N symptoms present)
-            sample_row = X_test.iloc[idx]
-            present_symptoms = sample_row[sample_row == 1].index.tolist()
-            
-            if len(present_symptoms) < initial_symptom_count:
-                continue
-                
-            initial_symptoms = present_symptoms[:initial_symptom_count]
-            
-            # Get initial prediction without sequential questioning
-            initial_vector = {symptom: 0 for symptom in symptom_names}
-            for symptom in initial_symptoms:
-                if symptom in initial_vector:
-                    initial_vector[symptom] = 1
-            
-            initial_input = pd.DataFrame([initial_vector])
-            initial_proba = calibrated_model.predict_proba(initial_input)[0]
-            initial_confidence = np.max(initial_proba)
-            initial_prediction = np.argmax(initial_proba)
-            initial_correct = (initial_prediction == y_test_enc[idx])
-            
-            # Run sequential questioning with specified method
-            result = sequential_questioning(initial_symptoms, max_questions=5, confidence_threshold=0.7, method=method)
-            
-            if result['status'] in ['confident', 'confident_after_questions']:
-                successful_predictions += 1
-                questions_needed.append(len(result['questions_asked']))
-                confidence_improvements.append(result['confidence'] - initial_confidence)
-                
-                # Check if prediction improved
-                final_prediction_correct = (le.classes_.tolist().index(result['prediction']) if isinstance(result['prediction'], str) and result['prediction'] in le.classes_ else result['prediction'] == y_test_enc[idx])
-                final_accuracies.append(1 if final_prediction_correct else 0)
-                
-                if not initial_correct and final_prediction_correct:
-                    accuracy_improvements.append(1)
-                elif initial_correct and not final_prediction_correct:
-                    accuracy_improvements.append(-1)
-                else:
-                    accuracy_improvements.append(0)
+        # Initial prediction without questions
+        initial_vector = {symptom: 0 for symptom in symptom_names}
+        for symptom in initial_symptoms:
+            if symptom in initial_vector:
+                initial_vector[symptom] = 1
         
-        if questions_needed:
-            evaluation_results.append({
-                'method': method,
-                'initial_symptoms': initial_symptom_count,
-                'samples_evaluated': len(questions_needed),
-                'avg_questions_needed': np.mean(questions_needed),
-                'std_questions_needed': np.std(questions_needed),
-                'avg_confidence_improvement': np.mean(confidence_improvements),
-                'successful_prediction_rate': successful_predictions / min(100, len(X_test)),
-                'final_accuracy': np.mean(final_accuracies) if final_accuracies else 0,
-                'accuracy_improvement_rate': np.mean([acc for acc in accuracy_improvements if acc != 0]) if [acc for acc in accuracy_improvements if acc != 0] else 0
-            })
+        initial_input = pd.DataFrame([initial_vector])
+        initial_proba = calibrated_model.predict_proba(initial_input)[0]
+        initial_confidence = np.max(initial_proba)
+        
+        # Run MI on this case
+        res_mi = sequential_questioning(initial_symptoms, max_questions=5, confidence_threshold=0.7, method='MI')
+        
+        # Run Random on the EXACT SAME case with deterministic seed for reproducibility
+        np.random.seed(idx + 42)
+        res_random = sequential_questioning(initial_symptoms, max_questions=5, confidence_threshold=0.7, method='Random')
+        
+        mi_q = len(res_mi['questions_asked'])
+        random_q = len(res_random['questions_asked'])
+        
+        mi_conf_gain = res_mi['confidence'] - initial_confidence
+        random_conf_gain = res_random['confidence'] - initial_confidence
+        
+        mi_acc = 1 if (res_mi['prediction'] in le.classes_ and le.classes_.tolist().index(res_mi['prediction']) == y_test_enc[idx]) else 0
+        random_acc = 1 if (res_random['prediction'] in le.classes_ and le.classes_.tolist().index(res_random['prediction']) == y_test_enc[idx]) else 0
+        
+        paired_cases.append({
+            'case_idx': idx,
+            'initial_symptoms_count': initial_symptom_count,
+            'mi_questions': mi_q,
+            'random_questions': random_q,
+            'mi_conf_gain': mi_conf_gain,
+            'random_conf_gain': random_conf_gain,
+            'mi_accuracy': mi_acc,
+            'random_accuracy': random_acc
+        })
+    
+    if paired_cases:
+        df_paired = pd.DataFrame(paired_cases)
+        n_samples = len(df_paired)
+        
+        # Mean & Std for MI
+        mi_avg_q = df_paired['mi_questions'].mean()
+        mi_avg_cg = df_paired['mi_conf_gain'].mean()
+        mi_avg_acc = df_paired['mi_accuracy'].mean()
+        
+        # Mean & Std for Random
+        rand_avg_q = df_paired['random_questions'].mean()
+        rand_avg_cg = df_paired['random_conf_gain'].mean()
+        rand_avg_acc = df_paired['random_accuracy'].mean()
+        
+        # Paired statistics for Questions Needed (Random - MI: positive means MI saved questions)
+        q_diff = df_paired['mi_questions'] - df_paired['random_questions']
+        q_mean_diff = q_diff.mean()
+        q_std_diff = q_diff.std(ddof=1) if n_samples > 1 else 0
+        q_ci = 1.96 * (q_std_diff / np.sqrt(n_samples)) if n_samples > 1 else 0
+        t_stat_q, p_val_q = ttest_rel(df_paired['mi_questions'], df_paired['random_questions']) if n_samples > 1 and np.any(q_diff != 0) else (0, 1.0)
+        
+        # Paired statistics for Confidence Gain (MI - Random: positive means MI improved confidence more)
+        cg_diff = df_paired['mi_conf_gain'] - df_paired['random_conf_gain']
+        cg_mean_diff = cg_diff.mean()
+        cg_std_diff = cg_diff.std(ddof=1) if n_samples > 1 else 0
+        cg_ci = 1.96 * (cg_std_diff / np.sqrt(n_samples)) if n_samples > 1 else 0
+        t_stat_cg, p_val_cg = ttest_rel(df_paired['mi_conf_gain'], df_paired['random_conf_gain']) if n_samples > 1 and np.any(cg_diff != 0) else (0, 1.0)
+        try:
+            w_stat_cg, w_pval_cg = wilcoxon(df_paired['mi_conf_gain'], df_paired['random_conf_gain']) if n_samples > 1 and np.any(cg_diff != 0) else (0, 1.0)
+        except Exception:
+            w_pval_cg = p_val_cg
             
-            print(f"  Average questions needed: {np.mean(questions_needed):.2f} ± {np.std(questions_needed):.2f}")
-            print(f"  Average confidence improvement: {np.mean(confidence_improvements):.4f}")
-            print(f"  Successful prediction rate: {successful_predictions / min(100, len(X_test)):.4f}")
-            print(f"  Final accuracy: {np.mean(final_accuracies):.4f}" if final_accuracies else "")
+        evaluation_results.append({
+            'method': 'MI',
+            'initial_symptoms': initial_symptom_count,
+            'samples_evaluated': n_samples,
+            'avg_questions_needed': mi_avg_q,
+            'avg_confidence_improvement': mi_avg_cg,
+            'final_accuracy': mi_avg_acc
+        })
+        evaluation_results.append({
+            'method': 'Random',
+            'initial_symptoms': initial_symptom_count,
+            'samples_evaluated': n_samples,
+            'avg_questions_needed': rand_avg_q,
+            'avg_confidence_improvement': rand_avg_cg,
+            'final_accuracy': rand_avg_acc
+        })
+        
+        stat_test_results.append({
+            'initial_symptoms': initial_symptom_count,
+            'n_cases': n_samples,
+            'mi_avg_conf_gain': mi_avg_cg,
+            'random_avg_conf_gain': rand_avg_cg,
+            'conf_gain_mean_diff': cg_mean_diff,
+            'conf_gain_95_ci': cg_ci,
+            'conf_gain_p_value_ttest': p_val_cg,
+            'conf_gain_p_value_wilcoxon': w_pval_cg,
+            'mi_avg_questions': mi_avg_q,
+            'random_avg_questions': rand_avg_q,
+            'questions_mean_diff': q_mean_diff,
+            'questions_95_ci': q_ci,
+            'questions_p_value': p_val_q
+        })
+        
+        print(f"  Cases evaluated: {n_samples} identical cases")
+        print(f"  MI vs Random Questions Needed: {mi_avg_q:.2f} vs {rand_avg_q:.2f} (diff: {q_mean_diff:+.2f} ± {q_ci:.2f}, p={p_val_q:.4f})")
+        print(f"  MI vs Random Confidence Gain: {mi_avg_cg:.4f} vs {rand_avg_cg:.4f} (diff: {cg_mean_diff:+.4f} ± {cg_ci:.4f}, p_ttest={p_val_cg:.4e}, p_wilcoxon={w_pval_cg:.4e})")
 
 # Save evaluation results
 if evaluation_results:
     eval_df = pd.DataFrame(evaluation_results)
     eval_df.to_csv('results/sequential_questioning_evaluation.csv', index=False)
     print(f"\n✅ Saved sequential questioning evaluation to results/sequential_questioning_evaluation.csv")
-    print(eval_df.to_string(index=False))
+    
+    stat_df = pd.DataFrame(stat_test_results)
+    stat_df.to_csv('results/sequential_questioning_statistical_test.csv', index=False)
+    print(f"✅ Saved paired statistical test results to results/sequential_questioning_statistical_test.csv")
+    print(stat_df.to_string(index=False))
     
     # Create visualization comparing MI vs Random
     import matplotlib.pyplot as plt

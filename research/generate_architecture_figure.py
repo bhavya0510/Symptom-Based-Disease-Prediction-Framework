@@ -145,7 +145,7 @@ def create_architecture_figure():
     eval_y = y_positions[6]
     
     output_x = [2, 5, 8]
-    output_labels = ["Top-K", "Abstention", "SHAP"]
+    output_labels = ["Top-K", "Abstention", "XGBoost SHAP"]
     
     for ox, label in zip(output_x, output_labels):
         # Draw branch box

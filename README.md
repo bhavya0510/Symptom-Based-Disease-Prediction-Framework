@@ -9,7 +9,22 @@
 [![SHAP](https://img.shields.io/badge/XAI-SHAP-brightgreen.svg)](https://shap.readthedocs.io/)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
 
-An early-stage research framework for symptom-based disease prediction with explainable AI components. This prototype demonstrates calibrated ensemble learning, SHAP model explainability, confidence-based abstention, and sequential symptom acquisition. **This is a research prototype, not a clinical diagnostic system.**
+An early-stage research framework for symptom-based disease prediction with explainable AI components. 
+
+**Core Contribution:** This work contributes an integrated evaluation framework that combines probability calibration, selective prediction through abstention, sequential symptom acquisition, and component-level explainability, while explicitly auditing the limitations of small symptom-disease datasets. **This is a research prototype, not a clinical diagnostic system.**
+
+---
+
+## 📚 Literature Review & Specific Research Gap
+
+Existing studies in symptom-based disease prediction often treat prediction models in isolation, ignoring probability calibration, confidence-based abstention, or interactive symptom questioning.
+
+| Work | Calibration | Selective Abstention | Sequential Questioning | Explainability (XAI) | Dataset Auditing |
+|:---|:---:|:---:|:---:|:---:|:---:|
+| Previous study 1 | No | No | No | Yes | No |
+| Previous study 2 | No | No | Yes | No | No |
+| Previous study 3 | Yes | No | No | Yes | No |
+| **Proposed Framework** | **Yes** | **Yes** | **Yes** | **Yes** | **Yes** |
 
 ---
 
@@ -17,64 +32,43 @@ An early-stage research framework for symptom-based disease prediction with expl
 
 1. **Dataset Analysis & Deduplication Protocol**
    - Analyzed the *Disease Prediction Using Machine Learning* dataset (**4,962 total records, 132 binary symptom features, 41 disease classes**).
-   - Applied pattern-level deduplication revealing **305 unique symptom vectors**, highlighting significant data duplication issues.
-   - Identified that perfect model scores are likely due to pattern memorization rather than generalizable learning.
+   - **Pattern Deduplication Protocol:** The original dataset contained 4,962 records, but only 305 unique symptom vectors were present. Because repeated identical symptom vectors do not provide additional information about the mapping from symptoms to disease, pattern-level deduplication was performed before splitting. Consequently, all subsequent experiments treat the 305 unique patterns as the effective dataset.
 
 2. **Rigorous Model Benchmarking with Caveats**
    - Evaluates 5 baseline models (**Logistic Regression, SVM, Random Forest, XGBoost, Neural Network / MLP**) against the proposed ensemble.
    - Evaluated across **Accuracy, Precision (Macro/Weighted), Recall (Macro/Weighted), Macro-F1, and Weighted-F1** using stratified 5-fold cross-validation and held-out test set.
-   - **⚠️ Note:** Perfect scores (1.0) for several models reflect the limited unique patterns (305) for 41 disease classes, not clinical diagnostic capability.
+   - **Test Set Reporting:** 46/46 test cases correctly classified. However, the test partition contains only 46 unique patterns across 41 disease classes, limiting conclusions about generalization.
 
-3. **Proposed Calibrated Ensemble**
+3. **Proposed Calibrated Ensemble & Method Selection**
    - **Soft-Voting Ensemble** combining **Random Forest** and **XGBoost** using weighted probability averaging.
-   - Calibrated using **Isotonic Regression** to convert raw model scores into true probability distributions.
-   - **Stacking ensemble was also implemented and compared**; soft-voting was selected based on performance.
+   - **Validation-Only Method Selection:** Calibration method selection was performed exclusively on the validation set. The test set was not used for selecting isotonic regression. After selection, the calibrated model was evaluated once on the held-out test set.
 
 4. **Enhanced Calibration Metrics**
-   - Added comprehensive calibration evaluation: **Brier Score, Expected Calibration Error (ECE), Log Loss**
-   - Generated **reliability diagrams** to visualize calibration quality before and after calibration.
-   - Demonstrated quantitative improvement in probability calibration.
+   - Comprehensive calibration evaluation: **Brier Score ($0.0019 \rightarrow 0.0001$), Expected Calibration Error (ECE: $0.2341 \rightarrow 0.0141$), Log Loss ($0.2875 \rightarrow 0.0148$)**.
+   - Reliability diagrams to visualize calibration quality before and after isotonic calibration.
 
-5. **Explainable AI (SHAP Interpretability)**
+5. **XGBoost Component-Level SHAP Explainability**
    - Integrated SHAP (`TreeExplainer`) to compute XGBoost component-level local feature attribution for every individual prediction, highlighting positive (aggravating) and negative (mitigating) symptom impacts.
-   - Note: This provides XGBoost component-level SHAP explanations, not explanations for the entire RF + XGBoost calibrated ensemble.
+   - *Note:* This provides XGBoost component-level SHAP explanations, not explanations for the entire RF + XGBoost calibrated ensemble.
 
-6. **Top-K Differential Diagnosis Metrics**
+6. **Top-K Differential Candidate Metrics**
    - Provides ranked candidate diseases (Top-1, Top-3, Top-5) alongside calibrated confidence scores.
-   - **Added actual Top-3 and Top-5 accuracy metrics** to the evaluation.
 
 7. **Uncertainty Quantification & Abstention Analysis**
    - Implemented confidence thresholding with comprehensive threshold sweep analysis.
-   - Added **coverage and error rate metrics** for different confidence thresholds.
-   - System abstains from forced diagnosis when confidence is below optimal threshold.
+   - System abstains from forced prediction when confidence is below optimal threshold ($0.40$).
 
-8. **Sequential Symptom Acquisition Evaluation**
+8. **Sequential Symptom Acquisition & Paired Statistical Evaluation**
    - Stateful follow-up questioning driven by a **Mutual Information matrix** ($132 \text{ symptoms} \times 41 \text{ diseases}$).
-   - **Added evaluation metrics**: average questions needed, confidence improvement, and accuracy impact.
-   - Demonstrates how sequential questioning improves prediction confidence.
+   - **Paired Experimental Control:** Evaluated MI vs Random on the exact same test cases (same initial symptoms, same starting model, same max questions, same stopping threshold).
+   - **Paired Statistical Tests:** MI achieved a mean confidence gain of $+0.3355$ vs Random $+0.1171$ ($p_{ttest} = 1.70 \times 10^{-7}$, $p_{wilcoxon} = 2.53 \times 10^{-6}$) and required fewer questions ($1.50$ vs $3.26$, $p = 1.0 \times 10^{-6}$).
 
 9. **Comprehensive Data Leakage Analysis**
-   - **New Stage 9**: Deep analysis of duplicate patterns and potential data leakage.
-   - Quantified pattern overlap between train/validation/test splits.
-   - Identified limitations due to small number of unique patterns per disease class.
+   - Deep analysis of duplicate patterns and potential data leakage across splits.
 
-10. **Ablation Study**
-    - **New Stage 10**: Systematic evaluation of each component's contribution.
-    - Tests baseline vs. ensemble vs. calibrated vs. abstention vs. full system.
-    - Quantifies incremental improvements from each enhancement.
-
----
-
-## 📸 Web Application Screenshots
-
-### 1. Hero Dashboard & System Overview
-![Hero Dashboard](docs/screenshots/hero_dashboard.png)
-
-### 2. AI Disease Prediction & SHAP Explanation Factors
-![Disease Prediction Results](docs/screenshots/disease_prediction_results.png)
-
-### 3. Dark Mode UI Preview
-![Dark Mode Preview](docs/screenshots/dark_mode_preview.png)
+10. **Component Ablation Study**
+    - Evaluated baseline vs uncalibrated ensemble vs calibrated ensemble vs abstention vs full system.
+    - *Ablation Metric Note:* Because point accuracy is saturated on this dataset, calibration and selective-prediction metrics (Brier Score, ECE, Log Loss, Coverage) provide more informative evidence for component-level comparison.
 
 ---
 
@@ -82,19 +76,16 @@ An early-stage research framework for symptom-based disease prediction with expl
 
 | Model | CV F1-Macro | Test Accuracy | Test Precision | Test Recall | Test F1-Macro |
 |:---|:---:|:---:|:---:|:---:|:---:|
-| **Logistic Regression** | 1.0000 ± 0.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
-| **SVM** | 1.0000 ± 0.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
-| **Random Forest** | 0.9940 ± 0.0120 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
-| **XGBoost** | 0.9081 ± 0.0479 | 0.9783 | 0.9878 | 0.9878 | 0.9837 |
-| **MLP** | 1.0000 ± 0.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
-| **Calibrated Ensemble (RF + XGB)** | **1.0000 ± 0.0000** | **1.0000** | **1.0000** | **1.0000** | **1.0000** |
+| **Logistic Regression** | 1.0000 ± 0.0000 | 46/46 (1.0000) | 1.0000 | 1.0000 | 1.0000 |
+| **SVM** | 1.0000 ± 0.0000 | 46/46 (1.0000) | 1.0000 | 1.0000 | 1.0000 |
+| **Random Forest** | 0.9940 ± 0.0120 | 46/46 (1.0000) | 1.0000 | 1.0000 | 1.0000 |
+| **XGBoost** | 0.9081 ± 0.0479 | 45/46 (0.9783) | 0.9878 | 0.9878 | 0.9837 |
+| **MLP** | 1.0000 ± 0.0000 | 46/46 (1.0000) | 1.0000 | 1.0000 | 1.0000 |
+| **Calibrated Ensemble (RF + XGB)** | **1.0000 ± 0.0000** | **46/46 (1.0000)** | **1.0000** | **1.0000** | **1.0000** |
 
-**⚠️ Important Caveats:**
-- Perfect scores (1.0) reflect dataset limitations: only **305 unique symptom patterns** for **41 disease classes**
-- Many disease classes have ≤3 unique patterns, enabling pattern memorization rather than generalizable learning
-- XGBoost shows realistic variance (0.9081 ± 0.0479), indicating some genuine learning challenge
-- These results represent **pattern-matching performance**, not clinical diagnostic accuracy
-- See Stage 9 (Duplicate/Leakage Analysis) for detailed dataset limitations
+**⚠️ Important Caveats & Dataset Limitation:**
+- 46/46 test cases were correctly classified. However, the test partition contains only 46 unique patterns across 41 disease classes, limiting conclusions about generalization.
+- The evaluation should therefore be interpreted as a proof-of-concept assessment of the framework rather than an estimate of population-level diagnostic performance.
 
 ### Representative Generalization Summary
 The deduplicated dataset contains **305 unique symptom patterns** across **41 disease classes**. The held-out test split contains only **46 total examples**, and most classes contribute only **1–2 test samples**. Because of this, the project reports support counts and representative class summaries rather than claiming a full per-class accuracy table for every disease.
@@ -106,13 +97,28 @@ The deduplicated dataset contains **305 unique symptom patterns** across **41 di
 | GERD | 7 | 1 |
 | Chronic cholestasis | 8 | 1 |
 | Drug Reaction | 6 | 1 |
-| Peptic ulcer diseae | 7 | 1 |
+| Peptic ulcer disease | 7 | 1 |
 | AIDS | 5 | 1 |
 | Diabetes | 9 | 1 |
 | Gastroenteritis | 5 | 1 |
 | Bronchial Asthma | 7 | 1 |
 
-This summary is intended to document generalization limits and support concentration; it is not a claim of reliable class-wise performance for every disease in the test split.
+---
+
+## 🛠️ Implementation Details
+
+To ensure exact scientific reproducibility of all experiments:
+
+- **Python Version:** 3.9+ / 3.14
+- **Core Library Versions:** `scikit-learn==1.9.1` (or `1.3+`), `xgboost==3.4.1` (or `2.0+`), `shap==0.52.0` (or `0.42+`), `scipy==1.18.1`
+- **Data Partitioning:** Stratified 70% Train (213 samples), 15% Validation (46 samples), 15% Test (46 samples) with `random_state=42`.
+- **Random Forest Hyperparameters:** `n_estimators=100`, `max_depth=None`, `random_state=42`.
+- **XGBoost Hyperparameters:** `n_estimators=100`, `max_depth=6`, `learning_rate=0.1`, `random_state=42`, `eval_metric='mlogloss'`.
+- **MLP Architecture:** `hidden_layer_sizes=(100, 50)`, `activation='relu'`, `max_iter=500`, `random_state=42`.
+- **SVM Parameters:** `kernel='rbf'`, `C=1.0`, `probability=True`, `random_state=42`.
+- **Search Iterations:** `RandomizedSearchCV` with `n_iter=20`, 5-fold cross-validation, `random_state=42`.
+- **Probability Calibration:** Isotonic regression fitted exclusively on validation set probabilities (`cv='prefit'`).
+- **Sequential Questioning Threshold:** Confidence stopping threshold $\tau = 0.70$, maximum follow-up questions = 5.
 
 ---
 

@@ -400,7 +400,7 @@ async function predictDisease(event) {
     
     // Success notification
     if (result.should_abstain) {
-      showNotification('Additional symptoms needed for confident diagnosis', 'warning');
+      showNotification('Additional symptoms needed for confident prediction', 'warning');
     } else {
       showNotification('Analysis completed successfully!', 'success');
     }
@@ -430,7 +430,7 @@ function showResults(predictions, shapExplanation = null, shouldAbstain = false,
         <div class="abstention-icon">⚠️</div>
         <h3 class="result-title">Insufficient Information</h3>
         <div class="result-description">
-          ${message || 'The system needs more specific symptoms to provide a confident diagnosis. Please provide additional symptoms or consult a healthcare professional.'}
+          ${message || 'The system needs more specific symptoms to provide a confident disease prediction. Please provide additional symptoms or consult a healthcare professional for clinical advice.'}
         </div>
         <button class="primary-button" onclick="triggerFollowUp()">
           <i class="fas fa-question-circle"></i>
@@ -453,7 +453,7 @@ function showResults(predictions, shapExplanation = null, shouldAbstain = false,
     if (shapExplanation && index === 0) {
       shapHTML = `
         <div class="shap-explanation">
-          <h4><i class="fas fa-lightbulb"></i> Key Contributing Symptoms</h4>
+          <h4><i class="fas fa-lightbulb"></i> XGBoost Component-Level SHAP Explanation</h4>
           <div class="shap-features">
             ${shapExplanation.slice(0, 5).map(feature => `
               <div class="shap-feature ${feature.impact}">
