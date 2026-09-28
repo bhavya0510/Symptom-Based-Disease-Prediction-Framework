@@ -223,62 +223,80 @@ with open('results/duplicate_leakage_analysis.json', 'w') as f:
     json.dump(analysis_report, f, indent=2)
 print("✅ Saved analysis report to results/duplicate_leakage_analysis.json")
 
-# Create generalization table with representative disease classes and actual class-wise metrics
-print("\nCreating generalization table with representative disease classes and test-set metrics...")
+# Create complete generalization table covering ALL 41 disease classes
+print("\nCreating generalization table covering ALL 41 disease classes...")
+
+import joblib
 
 pattern_data = pd.read_csv('results/per_class_split_counts.csv')
-pattern_data = pattern_data.rename(columns={'Disease': 'Disease/Class'})
+le = joblib.load('results/label_encoder.pkl')
+all_classes = sorted(le.classes_.tolist())
 
-# Use the final production model for per-class metrics on the held-out test set.
-try:
-    model = joblib.load('results/final_calibrated_ensemble.pkl')
-    test_df = pd.read_csv('data/processed/test.csv')
-    X_test = test_df.drop(columns=['prognosis'])
-    y_true = test_df['prognosis']
-    y_pred = model.predict(X_test)
-    label_set = sorted(y_true.unique())
-    per_class_rows = []
-    for disease in label_set:
-        true_mask = (y_true == disease)
-        pred_mask = (y_pred == disease)
-        tp = np.sum(true_mask & pred_mask)
-        support = int(true_mask.sum())
-        if support == 0:
-            acc = np.nan
-            precision = np.nan
-            recall = np.nan
-            f1 = np.nan
-        else:
-            acc = float(np.mean(y_pred[true_mask] == disease))
-            precision = float(tp / max(np.sum(pred_mask), 1))
-            recall = float(tp / support)
-            f1 = float(2 * precision * recall / max((precision + recall), 1e-12))
-        per_class_rows.append({
-            'Disease/Class': disease,
-            'Unique Patterns/Support': int(pattern_data.loc[pattern_data['Disease/Class'] == disease, 'Total_Unique_Patterns'].iloc[0]) if disease in pattern_data['Disease/Class'].values else support,
-            'Test Samples': support,
-            'Class-wise Accuracy': acc,
-            'Precision': precision,
-            'Recall': recall,
-            'F1': f1,
-        })
-    generalization_df = pd.DataFrame(per_class_rows).sort_values('Test Samples', ascending=False)
-except Exception:
-    generalization_df = pattern_data.rename(columns={'Total_Unique_Patterns': 'Unique Patterns/Support', 'Test': 'Test Samples'}).copy()
-    generalization_df['Class-wise Accuracy'] = np.nan
-    generalization_df['Precision'] = np.nan
-    generalization_df['Recall'] = np.nan
-    generalization_df['F1'] = np.nan
-    generalization_df = generalization_df[[ 'Disease/Class', 'Unique Patterns/Support', 'Test Samples', 'Class-wise Accuracy', 'Precision', 'Recall', 'F1' ]] 
+# Load production model and test set for class-wise evaluation
+model = joblib.load('results/final_calibrated_ensemble.pkl')
+test_df = pd.read_csv('data/processed/test.csv')
+X_test = test_df.drop(columns=['prognosis'])
+y_true = test_df['prognosis']
+y_pred = model.predict(X_test)
 
-representative_classes = generalization_df.head(10).copy()
-representative_classes.to_csv('results/generalization_table.csv', index=False)
-print("✅ Saved generalization table to results/generalization_table.csv")
+per_class_rows = []
+
+for disease in all_classes:
+    match_row = pattern_data[pattern_data['Disease'] == disease]
+    if not match_row.empty:
+        total_p = int(match_row['Total_Unique_Patterns'].iloc[0])
+        train_p = int(match_row['Train'].iloc[0])
+        val_p = int(match_row['Validation'].iloc[0])
+        test_p = int(match_row['Test'].iloc[0])
+    else:
+        total_p = train_p = val_p = test_p = 0
+    
+    true_mask = (y_true == disease)
+    pred_mask = (y_pred == disease)
+    support = int(true_mask.sum())
+    
+    if support > 0:
+        correct = int(np.sum(true_mask & pred_mask))
+        acc = float(correct / support)
+        tp = correct
+        fp = int(np.sum((~true_mask) & pred_mask))
+        fn = int(np.sum(true_mask & (~pred_mask)))
+        precision = float(tp / (tp + fp)) if (tp + fp) > 0 else 0.0
+        recall = float(tp / (tp + fn)) if (tp + fn) > 0 else 0.0
+        f1 = float(2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
+    else:
+        acc = 0.0
+        precision = 0.0
+        recall = 0.0
+        f1 = 0.0
+        
+    per_class_rows.append({
+        'Disease/Class': disease,
+        'Total Unique Patterns': total_p,
+        'Train Patterns': train_p,
+        'Validation Patterns': val_p,
+        'Test Patterns': test_p,
+        'Test Support': support,
+        'Class-wise Accuracy': acc,
+        'Precision': precision,
+        'Recall': recall,
+        'F1': f1
+    })
+
+generalization_df = pd.DataFrame(per_class_rows)
+
+# Programmatic verification assertions
+assert len(generalization_df) == 41, f"Expected 41 classes, got {len(generalization_df)}"
+assert generalization_df['Disease/Class'].nunique() == 41, "Duplicate classes found in generalization table!"
+assert generalization_df['Test Support'].sum() == len(test_df), f"Expected total test support {len(test_df)}, got {generalization_df['Test Support'].sum()}"
+
+generalization_df.to_csv('results/generalization_table.csv', index=False)
+print(f"✅ Saved complete 41-class generalization table to results/generalization_table.csv")
 
 print("\n" + "="*60)
-print("GENERALIZATION TABLE - Representative Disease Classes")
+print(f"GENERALIZATION TABLE - All {len(generalization_df)} Disease Classes")
 print("="*60)
-print(representative_classes.to_string(index=False))
+print(generalization_df.to_string(index=False))
 
 print("\n" + "="*60)
 print("DATASET LIMITATIONS - Generalization Concerns")
