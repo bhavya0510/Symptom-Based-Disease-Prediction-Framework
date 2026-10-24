@@ -177,14 +177,72 @@
                 </div>
                 
                 <form class="prediction-form" onsubmit="predictDisease(event)">
+                    <!-- Symptom Duration & Clinical Context -->
+                    <div class="form-group duration-group">
+                        <label>
+                            <i class="fas fa-stopwatch"></i>
+                            How long have you had these symptoms?
+                        </label>
+                        <div class="duration-controls">
+                            <div class="duration-chips" id="durationChips">
+                                <button type="button" class="duration-chip" data-days="2" data-category="acute" onclick="selectDurationChip(this, 2, 'acute')">
+                                    <span class="chip-icon"><i class="fas fa-clock"></i></span>
+                                    <span class="chip-text"><strong>1–2 Days</strong> <small>Acute</small></span>
+                                </button>
+                                <button type="button" class="duration-chip active" data-days="5" data-category="persistent" onclick="selectDurationChip(this, 5, 'persistent')">
+                                    <span class="chip-icon"><i class="fas fa-exclamation-circle"></i></span>
+                                    <span class="chip-text"><strong>3–5 Days</strong> <small>Persistent</small></span>
+                                </button>
+                                <button type="button" class="duration-chip" data-days="8" data-category="prolonged" onclick="selectDurationChip(this, 8, 'prolonged')">
+                                    <span class="chip-icon"><i class="fas fa-exclamation-triangle"></i></span>
+                                    <span class="chip-text"><strong>6–10 Days</strong> <small>Prolonged</small></span>
+                                </button>
+                                <button type="button" class="duration-chip" data-days="15" data-category="chronic" onclick="selectDurationChip(this, 15, 'chronic')">
+                                    <span class="chip-icon"><i class="fas fa-hospital"></i></span>
+                                    <span class="chip-text"><strong>10+ Days</strong> <small>Chronic</small></span>
+                                </button>
+                            </div>
+                            <div class="custom-duration-row">
+                                <div class="counter-box">
+                                    <span class="counter-label">Exact Days:</span>
+                                    <button type="button" class="counter-btn" onclick="adjustDuration(-1)">−</button>
+                                    <input type="number" id="durationDays" min="1" max="90" value="5" onchange="onCustomDurationChange(this.value)">
+                                    <button type="button" class="counter-btn" onclick="adjustDuration(1)">+</button>
+                                    <span class="counter-unit">days</span>
+                                </div>
+                                <div class="severity-box">
+                                    <span class="counter-label">Severity:</span>
+                                    <div class="severity-radios">
+                                        <label class="severity-pill"><input type="radio" name="severity" value="mild"> <span>Mild</span></label>
+                                        <label class="severity-pill"><input type="radio" name="severity" value="moderate" checked> <span>Moderate</span></label>
+                                        <label class="severity-pill"><input type="radio" name="severity" value="severe"> <span>Severe</span></label>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Dynamic Clinical Tip for Fever / Prolonged Duration -->
+                            <div id="liveClinicalTip" class="live-clinical-tip">
+                                <i class="fas fa-stethoscope"></i>
+                                <span id="liveClinicalTipText">Persistent fever or symptoms for 3+ days require monitoring for Dengue, Typhoid, or viral infection.</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="form-group">
                         <label for="symptoms">
                             <i class="fas fa-notes-medical"></i>
                             Select Your Symptoms
                         </label>
+                        <!-- Category quick filter tabs -->
+                        <div class="symptom-category-tabs">
+                            <button type="button" class="category-tab active" onclick="filterByCategory('all')">All (132)</button>
+                            <button type="button" class="category-tab" onclick="filterByCategory('fever')"><i class="fas fa-thermometer-half"></i> Fever & Chills</button>
+                            <button type="button" class="category-tab" onclick="filterByCategory('respiratory')"><i class="fas fa-lungs"></i> Cough & Breathing</button>
+                            <button type="button" class="category-tab" onclick="filterByCategory('digestive')"><i class="fas fa-procedures"></i> Stomach & Liver</button>
+                            <button type="button" class="category-tab" onclick="filterByCategory('aches')"><i class="fas fa-heartbeat"></i> Aches & Fatigue</button>
+                        </div>
                         <div class="symptom-selector">
                             <div class="search-symptoms">
-                                <input type="text" id="symptomSearch" placeholder="Search symptoms..." onkeyup="filterSymptoms()">
+                                <input type="text" id="symptomSearch" placeholder="Search symptoms (e.g., high fever, headache, joint pain)..." onkeyup="filterSymptoms()">
                                 <i class="fas fa-search"></i>
                             </div>
                             <div class="symptoms-grid" id="symptomsGrid">
@@ -266,22 +324,46 @@
         <div class="container">
             <div class="section-header">
                 <h2 class="section-title">
-                    <i class="fas fa-chart-line"></i>
-                    AI Analysis Results
+                    <i class="fas fa-notes-medical"></i>
+                    AI Health Assessment & Doctor Advisory
                 </h2>
-                <p>Top predictions based on your symptoms and profile</p>
+                <p>Personalized differential diagnosis, clinical urgency triage, and diagnostic test recommendations</p>
             </div>
+
+            <!-- Clinical Advisory / Doctor Consultation Warning & Tests Panel -->
+            <div id="clinicalAdvisoryContainer" class="clinical-advisory-container">
+                <!-- Dynamically populated clinical advisory & doctor warning -->
+            </div>
+
+            <!-- Model Differential Predictions Section -->
+            <div class="predictions-header-block" id="predictionsHeaderBlock">
+                <div class="pred-title-wrap">
+                    <h3><i class="fas fa-brain"></i> Calibrated Differential Predictions</h3>
+                    <span class="pred-tag">RF + XGBoost Ensemble</span>
+                </div>
+                <p class="pred-desc">Ranked disease probabilities calibrated via Isotonic Regression</p>
+            </div>
+
             <div class="results-grid" id="resultsGrid">
                 <!-- Dynamic results will be inserted here -->
             </div>
+            
             <div class="results-actions">
                 <button class="secondary-button" onclick="resetForm()">
                     <i class="fas fa-redo"></i>
                     New Analysis
                 </button>
-                <button class="primary-button" onclick="exportResults()">
+                <button class="primary-button doctor-sheet-btn" onclick="openDoctorSummaryModal()">
+                    <i class="fas fa-file-medical"></i>
+                    Doctor Consultation Sheet
+                </button>
+                <button class="secondary-button" onclick="findNearbyClinics()">
+                    <i class="fas fa-map-marker-alt"></i>
+                    Find Nearby Clinics
+                </button>
+                <button class="secondary-button export-btn" onclick="exportResults()">
                     <i class="fas fa-download"></i>
-                    Export Results
+                    Export Data
                 </button>
             </div>
         </div>
@@ -372,6 +454,38 @@
             </div>
         </div>
     </footer>
+
+    <!-- Doctor Consultation Summary Modal -->
+    <div id="doctorModal" class="modal-overlay hidden" onclick="closeDoctorModalOnBackdrop(event)">
+        <div class="modal-card glass-card">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <i class="fas fa-file-medical-alt modal-icon"></i>
+                    <div>
+                        <h3>Clinical Consultation Summary Sheet</h3>
+                        <p class="modal-subtitle">Formatted report to share with your consulting physician</p>
+                    </div>
+                </div>
+                <button class="modal-close-btn" onclick="closeDoctorModal()" aria-label="Close modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body" id="doctorModalBody">
+                <!-- Dynamically generated printable clinical sheet -->
+            </div>
+
+            <div class="modal-footer">
+                <button class="secondary-button" onclick="closeDoctorModal()">
+                    Close
+                </button>
+                <button class="primary-button" onclick="window.print()">
+                    <i class="fas fa-print"></i>
+                    Print / Save as PDF
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Toast Notification Container -->
     <div id="toastContainer" class="toast-container"></div>

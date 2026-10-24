@@ -18,6 +18,20 @@ const COMPARISON_API_URL = window.location.origin && window.location.origin !== 
 let isDarkMode = localStorage.getItem('darkMode') === 'true';
 let currentResults = [];
 let selectedSymptoms = new Set();
+let selectedDurationDays = 5;
+let selectedDurationCategory = 'persistent';
+let currentCategory = 'all';
+let lastClinicalAdvisory = null;
+let lastPredictions = [];
+let lastShapExplanation = null;
+
+const SYMPTOM_CATEGORIES = {
+  fever: ['high_fever', 'mild_fever', 'chills', 'shivering', 'sweating', 'headache', 'malaise', 'fatigue', 'toxic_look_(typhos)', 'sunken_eyes', 'dehydration'],
+  respiratory: ['cough', 'breathlessness', 'chest_pain', 'phlegm', 'throat_irritation', 'runny_nose', 'continuous_sneezing', 'sinus_pressure', 'congestion', 'blood_in_sputum', 'rusty_sputum', 'mucoid_sputum'],
+  digestive: ['vomiting', 'diarrhoea', 'abdominal_pain', 'stomach_pain', 'acidity', 'indigestion', 'constipation', 'yellowish_skin', 'yellowing_of_eyes', 'dark_urine', 'yellow_urine', 'nausea', 'loss_of_appetite', 'stomach_bleeding', 'belly_pain', 'passage_of_gases'],
+  aches: ['joint_pain', 'muscle_pain', 'back_pain', 'neck_pain', 'pain_behind_the_eyes', 'fatigue', 'weakness_in_limbs', 'dizziness', 'cramps', 'knee_pain', 'hip_joint_pain', 'swelling_joints', 'stiff_neck']
+};
+
 let allSymptoms = [
   'itching', 'skin_rash', 'nodal_skin_eruptions', 'continuous_sneezing', 'shivering', 'chills',
   'joint_pain', 'stomach_pain', 'acidity', 'ulcers_on_tongue', 'muscle_wasting', 'vomiting',
@@ -60,17 +74,26 @@ function initApp() {
   initFormInteractions();
   loadModelComparison();
   
-  // Global functions for onclick handlers
   window.predictDisease = predictDisease;
   window.scrollToForm = scrollToForm;
   window.scrollToFeatures = scrollToFeatures;
   window.toggleSymptom = toggleSymptom;
   window.filterSymptoms = filterSymptoms;
+  window.filterByCategory = filterByCategory;
+  window.selectDurationChip = selectDurationChip;
+  window.adjustDuration = adjustDuration;
+  window.onCustomDurationChange = onCustomDurationChange;
+  window.openDoctorSummaryModal = openDoctorSummaryModal;
+  window.closeDoctorModal = closeDoctorModal;
+  window.closeDoctorModalOnBackdrop = closeDoctorModalOnBackdrop;
+  window.findNearbyClinics = findNearbyClinics;
   window.resetForm = resetForm;
   window.exportResults = exportResults;
   window.toggleMobileMenu = toggleMobileMenu;
   window.triggerFollowUp = triggerFollowUp;
   window.answerFollowUp = answerFollowUp;
+  
+  updateLiveClinicalTip();
 }
 
 // === DARK MODE ===
@@ -265,6 +288,7 @@ function toggleSymptom(symptom) {
   
   updateSelectedSymptomsDisplay();
   updateSymptomCheckboxUI(symptom);
+  updateLiveClinicalTip();
 }
 
 function updateSymptomCheckboxUI(symptom) {
@@ -308,12 +332,119 @@ function updateSelectedSymptomsDisplay() {
   });
 }
 
+// === DURATION & CLINICAL CONTEXT CONTROLS ===
+function selectDurationChip(btn, days, category) {
+  document.querySelectorAll('.duration-chip').forEach(c => c.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  
+  selectedDurationDays = parseInt(days);
+  selectedDurationCategory = category;
+  
+  const input = document.getElementById('durationDays');
+  if (input) input.value = selectedDurationDays;
+  
+  updateLiveClinicalTip();
+}
+
+function adjustDuration(delta) {
+  const input = document.getElementById('durationDays');
+  if (!input) return;
+  
+  let val = parseInt(input.value) || 1;
+  val = Math.max(1, Math.min(90, val + delta));
+  input.value = val;
+  onCustomDurationChange(val);
+}
+
+function onCustomDurationChange(val) {
+  selectedDurationDays = Math.max(1, Math.min(90, parseInt(val) || 1));
+  
+  // Categorize
+  if (selectedDurationDays <= 2) {
+    selectedDurationCategory = 'acute';
+  } else if (selectedDurationDays <= 5) {
+    selectedDurationCategory = 'persistent';
+  } else if (selectedDurationDays <= 10) {
+    selectedDurationCategory = 'prolonged';
+  } else {
+    selectedDurationCategory = 'chronic';
+  }
+  
+  // Sync chip active state
+  document.querySelectorAll('.duration-chip').forEach(c => {
+    const chipDays = parseInt(c.dataset.days);
+    if ((selectedDurationCategory === 'acute' && chipDays === 2) ||
+        (selectedDurationCategory === 'persistent' && chipDays === 5) ||
+        (selectedDurationCategory === 'prolonged' && chipDays === 8) ||
+        (selectedDurationCategory === 'chronic' && chipDays === 15)) {
+      c.classList.add('active');
+    } else {
+      c.classList.remove('active');
+    }
+  });
+  
+  updateLiveClinicalTip();
+}
+
+function updateLiveClinicalTip() {
+  const tipEl = document.getElementById('liveClinicalTip');
+  const tipText = document.getElementById('liveClinicalTipText');
+  if (!tipEl || !tipText) return;
+
+  const hasFever = Array.from(selectedSymptoms).some(s => s.includes('fever') || s === 'chills' || s === 'shivering');
+  const hasCough = Array.from(selectedSymptoms).some(s => s === 'cough' || s === 'breathlessness' || s === 'chest_pain');
+  const hasLiver = Array.from(selectedSymptoms).some(s => s.includes('yellow') || s.includes('urine'));
+  const days = selectedDurationDays;
+
+  if (hasFever) {
+    if (days >= 3) {
+      tipEl.className = 'live-clinical-tip alert-danger';
+      tipText.innerHTML = `<strong>Clinical Alert (${days} Days Fever):</strong> Fever persisting for 3+ days strongly requires testing for <strong>Dengue, Typhoid (Enteric Fever), or Malaria</strong>. Doctor consultation and CBC/Platelet test are advised.`;
+    } else {
+      tipEl.className = 'live-clinical-tip alert-warning';
+      tipText.innerHTML = `<strong>Fever detected (${days} day(s)):</strong> Stay well-hydrated. If fever persists past 48–72 hours, consult a doctor for a CBC & Platelet blood test.`;
+    }
+  } else if (hasCough && days >= 14) {
+    tipEl.className = 'live-clinical-tip alert-danger';
+    tipText.innerHTML = `<strong>Chronic Cough Alert (${days}+ days):</strong> Cough lasting 2+ weeks warrants clinical evaluation, Chest X-Ray, and Sputum/TB screening.`;
+  } else if (hasLiver) {
+    tipEl.className = 'live-clinical-tip alert-danger';
+    tipText.innerHTML = `<strong>Jaundice Alert:</strong> Yellowing of skin/eyes or dark urine indicates liver strain. Prompt Liver Function Tests (LFT) are recommended.`;
+  } else if (days >= 7) {
+    tipEl.className = 'live-clinical-tip alert-warning';
+    tipText.innerHTML = `<strong>Persistent Symptoms (${days} days):</strong> Prolonged symptoms warrant a comprehensive physical examination by a healthcare provider.`;
+  } else {
+    tipEl.className = 'live-clinical-tip';
+    tipText.innerHTML = `Persistent fever or symptoms for 3+ days require monitoring for Dengue, Typhoid, or viral complications.`;
+  }
+}
+
+function filterByCategory(category) {
+  currentCategory = category;
+  
+  // Highlight tab
+  document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
+  const activeBtn = window.event ? window.event.target.closest('.category-tab') : null;
+  if (activeBtn) activeBtn.classList.add('active');
+  
+  filterSymptoms();
+}
+
 function filterSymptoms() {
-  const searchTerm = document.getElementById('symptomSearch').value.toLowerCase();
-  const filteredSymptoms = allSymptoms.filter(symptom => 
+  const searchInput = document.getElementById('symptomSearch');
+  const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
+  
+  let baseSymptoms = allSymptoms;
+  if (currentCategory !== 'all' && SYMPTOM_CATEGORIES[currentCategory]) {
+    const catList = new Set(SYMPTOM_CATEGORIES[currentCategory]);
+    baseSymptoms = allSymptoms.filter(s => catList.has(s));
+  }
+  
+  const filteredSymptoms = baseSymptoms.filter(symptom => 
     symptom.toLowerCase().includes(searchTerm) ||
     formatSymptomName(symptom).toLowerCase().includes(searchTerm)
   );
+  
   renderSymptoms(filteredSymptoms);
 }
 
@@ -378,8 +509,14 @@ async function predictDisease(event) {
   setLoading(true);
   
   try {
+    const severityRadio = document.querySelector('input[name="severity"]:checked');
+    const severityVal = severityRadio ? severityRadio.value : 'moderate';
+
     const payload = { 
       symptoms: Array.from(selectedSymptoms),
+      duration_days: selectedDurationDays,
+      duration_category: selectedDurationCategory,
+      severity: severityVal,
       top_k: 5,
       abstention_threshold: 0.1
     };
@@ -396,10 +533,19 @@ async function predictDisease(event) {
     
     const result = await response.json();
     currentResults = result.predictions || [];
-    showResults(currentResults, result.shap_explanation, result.should_abstain);
+    lastPredictions = currentResults;
+    lastClinicalAdvisory = result.clinical_advisory;
+    lastShapExplanation = result.shap_explanation;
     
-    // Success notification
-    if (result.should_abstain) {
+    // Always render clinical advisory first so the patient sees doctor consultation & test recommendations
+    renderClinicalAdvisory(result.clinical_advisory, currentResults);
+
+    showResults(currentResults, result.shap_explanation, result.should_abstain, result.message, result.clinical_advisory);
+    
+    // Notifications
+    if (result.clinical_advisory && result.clinical_advisory.should_see_doctor) {
+      showNotification('Doctor consultation strongly advised for your symptoms', 'warning');
+    } else if (result.should_abstain) {
       showNotification('Additional symptoms needed for confident prediction', 'warning');
     } else {
       showNotification('Analysis completed successfully!', 'success');
@@ -413,35 +559,219 @@ async function predictDisease(event) {
   }
 }
 
+// === CLINICAL ADVISORY & DOCTOR CONSULTATION RENDERER ===
+function renderClinicalAdvisory(advisory, predictions) {
+  const container = document.getElementById('clinicalAdvisoryContainer');
+  if (!container) return;
+
+  if (!advisory) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const isUrgent = advisory.should_see_doctor;
+  const urgencyClass = advisory.urgency_color === 'critical' ? 'advisory-critical' :
+                       advisory.urgency_color === 'danger' ? 'advisory-danger' :
+                       advisory.urgency_color === 'warning' ? 'advisory-warning' : 'advisory-success';
+
+  // Build Diagnostic Tests HTML
+  let testsHTML = '';
+  if (advisory.recommended_tests && advisory.recommended_tests.length > 0) {
+    testsHTML = `
+      <div class="advisory-section tests-section">
+        <div class="section-title-wrap">
+          <h4><i class="fas fa-vial"></i> Recommended Medical Diagnostic Tests</h4>
+          <span class="tests-subtitle">Clinical laboratory investigations to request from your physician:</span>
+        </div>
+        <div class="tests-grid">
+          ${advisory.recommended_tests.map(test => {
+            const isCrit = test.importance.toLowerCase().includes('critical') || test.importance.toLowerCase().includes('mandatory');
+            return `
+              <div class="test-card ${isCrit ? 'test-critical' : ''}">
+                <div class="test-header">
+                  <div class="test-name-wrap">
+                    <i class="fas fa-microscope test-icon"></i>
+                    <span class="test-name">${test.test_name}</span>
+                  </div>
+                  <span class="test-badge ${isCrit ? 'badge-critical' : 'badge-priority'}">
+                    ${test.importance}
+                  </span>
+                </div>
+                <p class="test-reason"><i class="fas fa-check-circle"></i> ${test.reason}</p>
+                <div class="test-meta">
+                  <span><i class="fas fa-clock"></i> Expected Turnaround: <strong>${test.turnaround}</strong></span>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // Build Differential Risks HTML
+  let differentialHTML = '';
+  if (advisory.differential_risks && advisory.differential_risks.length > 0) {
+    differentialHTML = `
+      <div class="advisory-section differential-section">
+        <h4><i class="fas fa-stethoscope"></i> Key Conditions to Rule Out With a Doctor (Differential Diagnosis)</h4>
+        <div class="risks-grid">
+          ${advisory.differential_risks.map(risk => `
+            <div class="risk-card">
+              <div class="risk-title-row">
+                <span class="risk-disease"><i class="fas fa-virus"></i> ${risk.disease}</span>
+                <span class="risk-severity ${risk.severity.toLowerCase().replace(/\s+/g, '-')}">${risk.severity} Risk</span>
+              </div>
+              <p class="risk-reason">${risk.reason}</p>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // Build Medication Warning HTML
+  let medWarningHTML = '';
+  if (advisory.medication_warnings && advisory.medication_warnings.length > 0) {
+    medWarningHTML = `
+      <div class="medication-warning-box">
+        <i class="fas fa-exclamation-triangle warning-icon"></i>
+        <div class="warning-text">
+          ${advisory.medication_warnings.map(w => `<p>${w}</p>`).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // Red Flags Alert HTML
+  let redFlagsHTML = '';
+  if (advisory.red_flags && advisory.red_flags.length > 0) {
+    redFlagsHTML = `
+      <div class="red-flags-box">
+        <h4><i class="fas fa-ambulance"></i> Emergency Red Flags Identified:</h4>
+        <ul>
+          ${advisory.red_flags.map(f => `<li><strong>${f}</strong> — Requires immediate Emergency Department evaluation</li>`).join('')}
+        </ul>
+      </div>
+    `;
+  }
+
+  // Correlation Note HTML
+  let correlationHTML = '';
+  if (advisory.correlation_note) {
+    correlationHTML = `
+      <div class="correlation-note-box">
+        <i class="fas fa-link"></i>
+        <span>${advisory.correlation_note}</span>
+      </div>
+    `;
+  }
+
+  // Action checklist
+  let actionItemsHTML = '';
+  if (advisory.action_items && advisory.action_items.length > 0) {
+    actionItemsHTML = `
+      <div class="action-items-box">
+        <h4><i class="fas fa-clipboard-check"></i> Recommended Next Steps & Clinical Precautions:</h4>
+        <ul class="action-list">
+          ${advisory.action_items.map(item => `<li><i class="fas fa-arrow-right"></i> ${item}</li>`).join('')}
+        </ul>
+      </div>
+    `;
+  }
+
+  container.innerHTML = `
+    <div class="advisory-card ${urgencyClass} fade-in-up">
+      <div class="advisory-top-bar">
+        <div class="advisory-badge-group">
+          <span class="urgency-pill ${advisory.urgency_color}">
+            <span class="pulsing-dot"></span>
+            ${advisory.urgency_badge}
+          </span>
+          <span class="duration-pill">
+            <i class="fas fa-calendar-day"></i> Duration: <strong>${advisory.duration_days} Days</strong> (${advisory.duration_category})
+          </span>
+        </div>
+        <div class="advisory-timestamp">
+          <i class="fas fa-shield-alt"></i> Clinical Decision Support
+        </div>
+      </div>
+
+      <div class="advisory-advice">
+        <div class="advice-content">
+          <p>${advisory.doctor_advice.replace(/\n\n/g, '<br><br>')}</p>
+        </div>
+      </div>
+
+      ${correlationHTML}
+      ${redFlagsHTML}
+      ${differentialHTML}
+      ${testsHTML}
+      ${medWarningHTML}
+      ${actionItemsHTML}
+
+      <div class="advisory-footer-actions">
+        <div class="specialist-info">
+          <span><i class="fas fa-user-md"></i> Recommended Specialist:</span>
+          <strong>${advisory.specialists.join(', ')}</strong>
+        </div>
+        <div class="cta-actions">
+          <button type="button" class="btn-doctor-sheet" onclick="openDoctorSummaryModal()">
+            <i class="fas fa-file-medical"></i> Doctor Consultation Sheet
+          </button>
+          <button type="button" class="btn-find-clinics" onclick="findNearbyClinics()">
+            <i class="fas fa-hospital"></i> Find Nearby Care
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 // === RESULTS DISPLAY ===
-function showResults(predictions, shapExplanation = null, shouldAbstain = false, message = null) {
+function showResults(predictions, shapExplanation = null, shouldAbstain = false, message = null, advisory = null) {
   const grid = document.getElementById('resultsGrid');
   const section = document.getElementById('resultsSection');
+  const headerBlock = document.getElementById('predictionsHeaderBlock');
   
   if (!grid || !section) return;
   
   grid.innerHTML = '';
   section.classList.remove('hidden');
   
+  // Also render advisory if not rendered yet
+  if (advisory || lastClinicalAdvisory) {
+    renderClinicalAdvisory(advisory || lastClinicalAdvisory, predictions);
+  }
+  
   // Handle abstention case
   if (shouldAbstain || message) {
+    if (headerBlock) headerBlock.style.display = 'none';
     grid.innerHTML = `
       <div class="result-card abstention-card fade-in-up">
-        <div class="abstention-icon">⚠️</div>
-        <h3 class="result-title">Insufficient Information</h3>
+        <div class="abstention-icon"><i class="fas fa-info-circle"></i></div>
+        <h3 class="result-title">Additional Symptoms Needed for Exact Classification</h3>
         <div class="result-description">
-          ${message || 'The system needs more specific symptoms to provide a confident disease prediction. Please provide additional symptoms or consult a healthcare professional for clinical advice.'}
+          ${message || 'The AI model requires additional specific symptoms to reach a high-confidence disease classification. Please review the Clinical Advisory above and consider answering follow-up questions or consulting a medical practitioner.'}
         </div>
-        <button class="primary-button" onclick="triggerFollowUp()">
-          <i class="fas fa-question-circle"></i>
-          Get Follow-up Questions
-        </button>
+        <div class="abstention-actions">
+          <button class="primary-button" onclick="triggerFollowUp()">
+            <i class="fas fa-question-circle"></i>
+            Answer Sequential Follow-up Questions
+          </button>
+          <button class="secondary-button" onclick="openDoctorSummaryModal()">
+            <i class="fas fa-file-medical"></i>
+            View Doctor Consultation Sheet
+          </button>
+        </div>
       </div>
     `;
     section.scrollIntoView({ behavior: 'smooth' });
     return;
   }
   
+  if (headerBlock) headerBlock.style.display = 'block';
+
   // Display top-K predictions with research features
   predictions.forEach((prediction, index) => {
     const confidence = (prediction.confidence * 100).toFixed(1);
@@ -482,6 +812,123 @@ function showResults(predictions, shapExplanation = null, shouldAbstain = false,
   });
   
   section.scrollIntoView({ behavior: 'smooth' });
+}
+
+// === DOCTOR CONSULTATION SUMMARY MODAL & PRINTING ===
+function openDoctorSummaryModal() {
+  const modal = document.getElementById('doctorModal');
+  const body = document.getElementById('doctorModalBody');
+  if (!modal || !body) return;
+
+  const symptomsList = Array.from(selectedSymptoms).map(formatSymptomName);
+  const duration = selectedDurationDays;
+  const severityRadio = document.querySelector('input[name="severity"]:checked');
+  const severity = severityRadio ? severityRadio.value : 'moderate';
+  const advisory = lastClinicalAdvisory || {};
+  const predictions = lastPredictions || [];
+
+  const dateStr = new Date().toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+  });
+
+  body.innerHTML = `
+    <div class="doctor-sheet-content">
+      <div class="sheet-header-print">
+        <h2>HealthGuard AI — Clinical Patient Summary</h2>
+        <p>Medical Decision Support & Symptom Triage Report</p>
+      </div>
+
+      <div class="sheet-patient-bar">
+        <div><strong>Encounter Date:</strong> ${dateStr}</div>
+        <div><strong>Symptom Duration:</strong> ${duration} Days (${selectedDurationCategory})</div>
+        <div><strong>Reported Severity:</strong> <span style="text-transform: capitalize;">${severity}</span></div>
+      </div>
+
+      <div class="sheet-section">
+        <h4>1. Presenting Symptoms Reported (${symptomsList.length})</h4>
+        <div class="sheet-tags">
+          ${symptomsList.map(s => `<span class="sheet-tag">${s}</span>`).join('')}
+        </div>
+      </div>
+
+      <div class="sheet-section">
+        <h4>2. Clinical Risk & Urgency Assessment</h4>
+        <p class="sheet-urgency"><strong>Triage Level:</strong> ${advisory.urgency_badge || 'Clinical Evaluation Required'}</p>
+        <p class="sheet-advice">${advisory.doctor_advice || 'Patient presents with persistent symptoms requiring clinical physician evaluation.'}</p>
+      </div>
+
+      <div class="sheet-section">
+        <h4>3. Machine Learning Differential Predictions (Calibrated RF + XGBoost)</h4>
+        <table class="sheet-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Differential Disease</th>
+              <th>Model Probability</th>
+              <th>Clinical Correlation</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${predictions.slice(0, 4).map((p, idx) => `
+              <tr>
+                <td>#${idx + 1}</td>
+                <td><strong>${p.disease}</strong></td>
+                <td>${(p.confidence * 100).toFixed(1)}%</td>
+                <td>${idx === 0 && duration >= 3 && p.disease.toLowerCase().includes('dengue') ? 'Prolonged fever: Rule out Dengue thrombocytopenia' : 'Differential candidate'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="sheet-section">
+        <h4>4. Recommended Diagnostic Lab Investigations for Physician Review</h4>
+        <ul class="sheet-tests-list">
+          ${(advisory.recommended_tests || []).map(t => `
+            <li>
+              <strong>${t.test_name}</strong> <em>(${t.importance})</em>: ${t.reason}
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+
+      <div class="sheet-section doctor-notes-box">
+        <h4>5. Physician Physical Examination & Prescription Notes</h4>
+        <div class="notes-lines">
+          <div class="note-line"><strong>Vitals:</strong> BP: ___________ | Pulse: ___________ bpm | Temp: ___________ °F | SpO2: ___________ %</div>
+          <div class="note-line"><strong>Systemic Findings:</strong> ____________________________________________________________________</div>
+          <div class="note-line">_________________________________________________________________________________________</div>
+          <div class="note-line"><strong>Ordered Lab Tests:</strong> ___________________________________________________________________</div>
+          <div class="note-line"><strong>Doctor Signature / Stamp:</strong> ____________________________ Date: _________________________</div>
+        </div>
+      </div>
+
+      <div class="sheet-disclaimer">
+        <strong>Medical Disclaimer:</strong> HealthGuard AI is an academic research prototype for clinical decision support. It is not an automated medical diagnostic tool. Final diagnostic, laboratory, and treatment choices remain solely with the examining licensed healthcare professional.
+      </div>
+    </div>
+  `;
+
+  modal.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeDoctorModal() {
+  const modal = document.getElementById('doctorModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+}
+
+function closeDoctorModalOnBackdrop(event) {
+  if (event.target.id === 'doctorModal') {
+    closeDoctorModal();
+  }
+}
+
+function findNearbyClinics() {
+  window.open('https://www.google.com/maps/search/hospital+clinic+near+me/', '_blank');
 }
 
 // === FOLLOW-UP QUESTIONS ===

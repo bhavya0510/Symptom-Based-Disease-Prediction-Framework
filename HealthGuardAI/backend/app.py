@@ -10,6 +10,7 @@ import numpy as np
 import os
 from collections import defaultdict
 from shap_utils import explain_prediction
+from clinical_advisory import analyze_symptom_duration
 
 frontend_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend'))
 app = Flask(__name__, static_folder=frontend_folder, static_url_path='')
@@ -35,21 +36,21 @@ abstention_config = None
     
 try:
     shap_system = joblib.load(os.path.join(artifacts_dir, 'shap_system.pkl'))
-    print("✅ SHAP system loaded")
+    print("[OK] SHAP system loaded")
 except Exception as error:
-    print(f"⚠️  SHAP system not available: {error}")
+    print(f"[WARNING] SHAP system not available: {error}")
     
 try:
     mutual_info = joblib.load(os.path.join(artifacts_dir, 'mutual_information.pkl'))
-    print("✅ Mutual information loaded")
+    print("[OK] Mutual information loaded")
 except Exception as error:
-    print(f"⚠️  Mutual information not available: {error}")
+    print(f"[WARNING] Mutual information not available: {error}")
     
 try:
     abstention_config = joblib.load(os.path.join(artifacts_dir, 'abstention_config.pkl'))
-    print("✅ Abstention config loaded")
+    print("[OK] Abstention config loaded")
 except Exception as error:
-    print(f"⚠️  Abstention config not available: {error}")
+    print(f"[WARNING] Abstention config not available: {error}")
     
 symptom_names = metadata['symptom_names']
 n_classes = metadata['n_classes']
@@ -122,10 +123,14 @@ def predict():
     try:
         data = request.json
         
-        # Extract symptoms
+        # Extract symptoms & duration data
         symptoms_input = data.get('symptoms', [])
         top_k = data.get('top_k', 3)
         custom_threshold = data.get('abstention_threshold')
+        duration_days = data.get('duration_days')
+        duration_category = data.get('duration_category')
+        symptom_durations = data.get('symptom_durations', {})
+        severity = data.get('severity')
         
         # Use custom threshold if provided, otherwise use default
         current_threshold = custom_threshold if custom_threshold is not None else confidence_threshold
@@ -164,14 +169,28 @@ def predict():
             except Exception as e:
                 print(f"SHAP explanation error: {e}")
         
+        # Clinical Advisory Analysis (Duration & Risk Assessment)
+        top_pred_disease = predictions[0]['disease'] if predictions else None
+        top_pred_conf = predictions[0]['confidence'] if predictions else 0.0
+        clinical_advisory = analyze_symptom_duration(
+            symptoms=symptoms_input,
+            duration_days=duration_days,
+            duration_category=duration_category,
+            symptom_durations=symptom_durations,
+            predicted_disease=top_pred_disease,
+            confidence=top_pred_conf,
+            severity=severity
+        )
+        
         response = {
             'predictions': predictions,
-            'top_prediction': predictions[0]['disease'] if predictions else None,
+            'top_prediction': top_pred_disease,
             'max_confidence': max_confidence,
             'should_abstain': should_abstain,
             'message': 'Insufficient information — please provide additional symptoms' if should_abstain else None,
             'abstention_threshold': current_threshold,
             'shap_explanation': shap_explanation,
+            'clinical_advisory': clinical_advisory,
             'disclaimer': 'This is an AI decision-support prototype, not medical advice. Consult a healthcare professional.'
         }
         
@@ -259,10 +278,22 @@ def followup():
             prediction = model.predict(input_df)[0]
             disease = label_encoder.inverse_transform([prediction])[0]
             
+            # Clinical advisory for final follow-up prediction
+            duration_days = data.get('duration_days')
+            duration_category = data.get('duration_category')
+            clinical_advisory = analyze_symptom_duration(
+                symptoms=current_symptoms,
+                duration_days=duration_days,
+                duration_category=duration_category,
+                predicted_disease=disease,
+                confidence=max_confidence
+            )
+            
             return jsonify({
                 'status': 'final',
                 'prediction': disease,
                 'confidence': max_confidence,
+                'clinical_advisory': clinical_advisory,
                 'questions_asked': sessions[session_id]['questions_asked'],
                 'disclaimer': 'This is an AI decision-support prototype, not medical advice. Consult a healthcare professional.'
             })
@@ -279,6 +310,35 @@ def followup():
             'questions_remaining': max_questions - len(sessions[session_id]['questions_asked'])
         })
     
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/clinical-advisory', methods=['POST'])
+def clinical_advisory_endpoint():
+    """
+    Dedicated clinical advisory endpoint: Evaluates symptom duration, red flags,
+    differential risks (e.g. prolonged fever -> Dengue/Typhoid/Malaria), and recommended lab tests.
+    """
+    try:
+        data = request.json or {}
+        symptoms = data.get('symptoms', [])
+        duration_days = data.get('duration_days')
+        duration_category = data.get('duration_category')
+        symptom_durations = data.get('symptom_durations', {})
+        predicted_disease = data.get('predicted_disease')
+        confidence = data.get('confidence', 0.0)
+        severity = data.get('severity')
+
+        advisory = analyze_symptom_duration(
+            symptoms=symptoms,
+            duration_days=duration_days,
+            duration_category=duration_category,
+            symptom_durations=symptom_durations,
+            predicted_disease=predicted_disease,
+            confidence=confidence,
+            severity=severity
+        )
+        return jsonify(advisory)
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
