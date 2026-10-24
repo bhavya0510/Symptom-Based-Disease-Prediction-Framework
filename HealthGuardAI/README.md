@@ -4,15 +4,24 @@ An interactive web application demonstrating the **Explainable, Uncertainty-Awar
 
 ---
 
-## 📸 Screenshots
+## Screenshots & Visual Walkthrough
 
-### 1. Hero Dashboard & Overview
+### 1. Hero Dashboard & Clinical Overview
 ![Hero Dashboard](../docs/screenshots/hero_dashboard.png)
 
-### 2. Disease Prediction & XGBoost Component-Level SHAP Factors
+### 2. Symptom Duration & Live Clinical Triage
+![Symptom Duration Tracker](../docs/screenshots/symptom_duration_tracker.png)
+
+### 3. AI Health Assessment & Prolonged Fever Clinical Advisory
 ![Disease Prediction Results](../docs/screenshots/disease_prediction_results.png)
 
-### 3. Dark Mode UI Preview
+### 4. Recommended Diagnostic Laboratory Tests (CBC, Dengue NS1, Typhoid Widal)
+![Recommended Medical Diagnostic Tests](../docs/screenshots/clinical_diagnostic_tests.png)
+
+### 5. Printable Doctor Consultation Summary Sheet
+![Doctor Consultation Sheet](../docs/screenshots/doctor_consultation_sheet.png)
+
+### 6. Modern Dark Mode Theme
 ![Dark Mode Preview](../docs/screenshots/dark_mode_preview.png)
 
 ---

@@ -70,6 +70,12 @@ Existing studies in symptom-based disease prediction often treat prediction mode
     - Evaluated baseline vs uncalibrated ensemble vs calibrated ensemble vs abstention vs full system.
     - *Ablation Metric Note:* Because point accuracy is saturated on this dataset, calibration and selective-prediction metrics (Brier Score, ECE, Log Loss, Coverage) provide more informative evidence for component-level comparison.
 
+11. **Clinical Decision Advisory & Prolonged Symptom Triage**
+    - Automated risk escalation when symptoms persist over critical clinical thresholds (e.g. fever > 3–7+ days).
+    - Differential screening alerts for Dengue, Typhoid (Enteric Fever), Malaria, and systemic infections.
+    - Recommended lab diagnostic orders: Complete Blood Count (CBC) with Platelets, Dengue NS1/IgM, Typhoid Widal/Culture, and Malaria PBS.
+    - Exportable and printable Doctor Consultation Referral Summary sheets for clinical follow-up.
+
 ---
 
 ## 📊 Empirical Model Performance Comparison
@@ -203,11 +209,34 @@ Open **`http://127.0.0.1:5050`** in your browser.
 
 ---
 
+## 📸 Interactive Web Application Walkthrough
+
+### 1. Clinical Dashboard & Symptom Selection
+![Hero Dashboard](docs/screenshots/hero_dashboard.png)
+
+### 2. Symptom Duration & Severity Triage
+![Symptom Duration Tracker](docs/screenshots/symptom_duration_tracker.png)
+
+### 3. AI Health Assessment & Prolonged Symptom Doctor Advisory
+![Disease Prediction Results](docs/screenshots/disease_prediction_results.png)
+
+### 4. Recommended Medical Diagnostic Tests
+![Recommended Medical Diagnostic Tests](docs/screenshots/clinical_diagnostic_tests.png)
+
+### 5. Printable Doctor Consultation Summary Sheet
+![Doctor Consultation Sheet](docs/screenshots/doctor_consultation_sheet.png)
+
+### 6. Modern Dark Mode
+![Dark Mode Preview](docs/screenshots/dark_mode_preview.png)
+
+---
+
 ## 🔌 API Reference
 
 | Endpoint | Method | Description |
 |:---|:---:|:---|
-| `/predict` | `POST` | Accepts user symptom array; returns Top-K predictions, SHAP explanations, and abstention status. |
+| `/predict` | `POST` | Accepts user symptom array & duration; returns Top-K predictions, SHAP explanations, abstention status, and clinical advisory. |
+| `/clinical-advisory` | `POST` | Dedicated clinical rule engine evaluating prolonged symptoms, test recommendations, and doctor referral urgency. |
 | `/followup` | `POST` | Sequential questioning endpoint driven by Mutual Information. |
 | `/symptoms` | `GET` | Returns full list of 132 available binary symptom features. |
 | `/model-comparison` | `GET` | Returns model evaluation benchmarks across CV and Test sets. |
